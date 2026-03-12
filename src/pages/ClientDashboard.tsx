@@ -58,36 +58,43 @@ export default function ClientDashboard() {
       setAnalysis(data);
       setStep("analyzing");
 
-      // Simulate analysis (in real app, this would call an AI edge function)
-      setTimeout(() => {
-        const mockResult: Partial<Tables<"analyses">> = {
-          ...data,
-          face_shape: "Oval",
-          suggested_cut: "Degradê Médio com Textura no Topo",
-          cut_explanation:
-            "Com seu formato de rosto oval e as preferências indicadas, o degradê médio oferece versatilidade e modernidade. A textura no topo adiciona volume e movimento, criando um visual equilibrado que valoriza suas proporções faciais.",
-          maintenance_tips:
-            "Retoque o degradê a cada 15-20 dias. Use pomada matte para texturizar o topo. Lave com shampoo específico 3x por semana. Seque com secador em temperatura média para dar volume.",
-          status: "completed",
-        };
+      // Call real AI analysis edge function
+      const { data: aiResult, error: aiError } = await supabase.functions.invoke("analyze-face", {
+        body: {
+          analysisId: data.id,
+          photoUrl: publicUrl,
+          answers: answers,
+        },
+      });
 
-        supabase
-          .from("analyses")
-          .update({
-            face_shape: mockResult.face_shape,
-            suggested_cut: mockResult.suggested_cut,
-            cut_explanation: mockResult.cut_explanation,
-            maintenance_tips: mockResult.maintenance_tips,
-            status: "completed",
-          })
-          .eq("id", data.id)
-          .select()
-          .single()
-          .then(({ data: updated }) => {
-            if (updated) setAnalysis(updated);
-            setStep("result");
-          });
-      }, 3000);
+      if (aiError) {
+        console.error("AI analysis error:", aiError);
+        toast.error("Erro na análise. Tente novamente.");
+        setStep("photo");
+        return;
+      }
+
+      if (aiResult?.error) {
+        if (aiResult.error === "RATE_LIMITED") {
+          toast.error("Muitas requisições. Aguarde um momento e tente novamente.");
+        } else if (aiResult.error === "PAYMENT_REQUIRED") {
+          toast.error("Créditos insuficientes para análise IA.");
+        } else {
+          toast.error("Erro na análise: " + aiResult.error);
+        }
+        setStep("photo");
+        return;
+      }
+
+      // Fetch updated analysis from DB
+      const { data: updated } = await supabase
+        .from("analyses")
+        .select()
+        .eq("id", data.id)
+        .single();
+
+      if (updated) setAnalysis(updated);
+      setStep("result");
     } catch (err: any) {
       toast.error(err.message || "Erro ao enviar foto");
     } finally {
