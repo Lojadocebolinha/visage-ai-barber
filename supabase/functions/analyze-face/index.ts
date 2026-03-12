@@ -199,8 +199,7 @@ serve(async (req) => {
     if (!photoResponse.ok) throw new Error("Failed to fetch user photo");
 
     const mimeType = photoResponse.headers.get("content-type") || "image/jpeg";
-    const bytes = new Uint8Array(await photoResponse.arrayBuffer());
-    const base64Photo = cleanBase64(btoa(String.fromCharCode(...bytes)));
+    const base64Photo = cleanBase64(arrayBufferToBase64(await photoResponse.arrayBuffer()));
 
     const answersText = Object.entries(answers || {})
       .map(([q, a]) => `${q}: ${a}`)
