@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import PreAnalysisForm from "@/components/PreAnalysisForm";
@@ -24,12 +24,65 @@ export default function ClientDashboard() {
     setStep("photo");
   };
 
+  const runAnalysis = async (currentAnalysis: Tables<"analyses">, photoUrl: string) => {
+    setStep("analyzing");
+
+    const { data: aiResult, error: aiError } = await supabase.functions.invoke("analyze-face", {
+      body: {
+        analysisId: currentAnalysis.id,
+        photoUrl,
+        answers,
+      },
+    });
+
+    if (aiError) {
+      console.error("AI analysis error:", aiError);
+      toast.error("Erro na análise IA. Tente novamente.");
+      setStep("photo");
+      return;
+    }
+
+    if (aiResult?.error) {
+      if (aiResult.error === "RATE_LIMITED") {
+        toast.error("Muitas requisições. Aguarde um momento e tente novamente.");
+      } else if (aiResult.error === "PAYMENT_REQUIRED") {
+        toast.error("Créditos insuficientes para análise IA.");
+      } else if (aiResult.error === "IMAGE_GENERATION_FAILED") {
+        toast.error("Não foi possível gerar a imagem do corte. Tente novamente.");
+      } else {
+        toast.error("Erro na análise: " + aiResult.error);
+      }
+      setStep("photo");
+      return;
+    }
+
+    const { data: updated, error: fetchError } = await supabase
+      .from("analyses")
+      .select()
+      .eq("id", currentAnalysis.id)
+      .single();
+
+    if (fetchError || !updated) {
+      toast.error("Não foi possível carregar o resultado da análise.");
+      setStep("photo");
+      return;
+    }
+
+    if (!updated.generated_image_url) {
+      toast.error("A análise foi concluída, mas a imagem não foi gerada.");
+      setStep("photo");
+      return;
+    }
+
+    setAnalysis(updated);
+    setStep("result");
+  };
+
   const handlePhotoUpload = async (file: File) => {
     if (!user) return;
     setUploading(true);
 
     try {
-      // Upload photo
       const fileName = `${user.id}/${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from("analysis-photos")
@@ -37,17 +90,16 @@ export default function ClientDashboard() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("analysis-photos")
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("analysis-photos").getPublicUrl(fileName);
 
-      // Create analysis record
       const { data, error } = await supabase
         .from("analyses")
         .insert({
           user_id: user.id,
           photo_url: publicUrl,
-          answers: answers,
+          answers,
           status: "pending",
         })
         .select()
@@ -56,47 +108,26 @@ export default function ClientDashboard() {
       if (error) throw error;
 
       setAnalysis(data);
-      setStep("analyzing");
-
-      // Call real AI analysis edge function
-      const { data: aiResult, error: aiError } = await supabase.functions.invoke("analyze-face", {
-        body: {
-          analysisId: data.id,
-          photoUrl: publicUrl,
-          answers: answers,
-        },
-      });
-
-      if (aiError) {
-        console.error("AI analysis error:", aiError);
-        toast.error("Erro na análise. Tente novamente.");
-        setStep("photo");
-        return;
-      }
-
-      if (aiResult?.error) {
-        if (aiResult.error === "RATE_LIMITED") {
-          toast.error("Muitas requisições. Aguarde um momento e tente novamente.");
-        } else if (aiResult.error === "PAYMENT_REQUIRED") {
-          toast.error("Créditos insuficientes para análise IA.");
-        } else {
-          toast.error("Erro na análise: " + aiResult.error);
-        }
-        setStep("photo");
-        return;
-      }
-
-      // Fetch updated analysis from DB
-      const { data: updated } = await supabase
-        .from("analyses")
-        .select()
-        .eq("id", data.id)
-        .single();
-
-      if (updated) setAnalysis(updated);
-      setStep("result");
+      await runAnalysis(data, publicUrl);
     } catch (err: any) {
       toast.error(err.message || "Erro ao enviar foto");
+      setStep("photo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!analysis?.photo_url) {
+      toast.error("Foto original não encontrada para gerar novamente.");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      await runAnalysis(analysis, analysis.photo_url);
+    } catch {
+      toast.error("Erro ao gerar novamente.");
     } finally {
       setUploading(false);
     }
@@ -114,7 +145,6 @@ export default function ClientDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-gradient-gold flex items-center justify-center">
@@ -143,13 +173,10 @@ export default function ClientDashboard() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-lg mx-auto px-4 py-8">
         {step === "questionnaire" && (
           <div>
-            <h2 className="text-2xl font-display font-bold text-foreground mb-2">
-              Pré-Análise
-            </h2>
+            <h2 className="text-2xl font-display font-bold text-foreground mb-2">Pré-Análise</h2>
             <p className="text-muted-foreground text-sm mb-6">
               Responda algumas perguntas para personalizarmos sua sugestão.
             </p>
@@ -157,20 +184,16 @@ export default function ClientDashboard() {
           </div>
         )}
 
-        {step === "photo" && (
-          <PhotoUpload onUpload={handlePhotoUpload} uploading={uploading} />
-        )}
+        {step === "photo" && <PhotoUpload onUpload={handlePhotoUpload} uploading={uploading} />}
 
         {step === "analyzing" && (
           <div className="text-center py-16 animate-fade-in">
             <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-gradient-gold flex items-center justify-center animate-pulse">
               <Scissors className="w-8 h-8 text-primary-foreground" />
             </div>
-            <h3 className="text-xl font-display font-semibold text-foreground mb-2">
-              Analisando...
-            </h3>
+            <h3 className="text-xl font-display font-semibold text-foreground mb-2">Analisando...</h3>
             <p className="text-muted-foreground text-sm">
-              Nosso visagista IA está avaliando seu rosto e preferências.
+              Nosso visagista IA está avaliando seu rosto e gerando a simulação do corte.
             </p>
           </div>
         )}
@@ -180,7 +203,7 @@ export default function ClientDashboard() {
             <AnalysisResult
               analysis={analysis}
               onSave={handleSave}
-              onRegenerate={startNew}
+              onRegenerate={handleRegenerate}
             />
             <Button
               variant="outline"
