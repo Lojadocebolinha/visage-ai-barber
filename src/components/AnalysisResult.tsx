@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Scissors, Lightbulb, Wrench, Save, User, Layers } from "lucide-react";
+import { Scissors, Lightbulb, Wrench, Save, User, Layers, RefreshCw } from "lucide-react";
 
 interface AnalysisData {
   face_shape?: string | null;
@@ -19,11 +19,13 @@ interface AnalysisData {
   cut_explanation?: string | null;
   maintenance_tips?: string | null;
   generated_image_url?: string | null;
+  photo_url?: string | null;
 }
 
 interface AnalysisResultProps {
   analysis: AnalysisData;
   onSave?: () => void;
+  onRegenerate?: () => void;
   saved?: boolean;
 }
 
@@ -37,12 +39,74 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-export default function AnalysisResult({ analysis, onSave, saved }: AnalysisResultProps) {
+export default function AnalysisResult({ analysis, onSave, onRegenerate, saved }: AnalysisResultProps) {
+  // Parse maintenance_tips if it's a JSON string array
+  let tipsDisplay = analysis.maintenance_tips || "";
+  try {
+    const parsed = JSON.parse(tipsDisplay);
+    if (Array.isArray(parsed)) {
+      tipsDisplay = parsed.map((t: string) => `• ${t}`).join("\n\n");
+    }
+  } catch {
+    // Already a string, check if it starts with bullet
+    if (tipsDisplay && !tipsDisplay.startsWith("•")) {
+      tipsDisplay = `• ${tipsDisplay}`;
+    }
+  }
+
   return (
     <div className="animate-slide-up space-y-5">
       <h2 className="text-2xl font-display font-bold text-gradient-gold text-center">
         Resultado da Análise Visagista
       </h2>
+
+      {/* Before & After */}
+      {(analysis.photo_url || analysis.generated_image_url) && (
+        <div className="glass-card rounded-xl p-4">
+          <p className="text-sm font-semibold text-foreground text-center mb-3">
+            {analysis.photo_url && analysis.generated_image_url ? "Antes & Depois" : "Visualização"}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {analysis.photo_url && (
+              <div>
+                <p className="text-xs text-muted-foreground text-center mb-1">Antes</p>
+                <img
+                  src={analysis.photo_url}
+                  alt="Foto original"
+                  className="w-full rounded-lg object-cover aspect-[3/4]"
+                />
+              </div>
+            )}
+            {analysis.generated_image_url && (
+              <div>
+                <p className="text-xs text-muted-foreground text-center mb-1">Depois</p>
+                <img
+                  src={analysis.generated_image_url}
+                  alt="Visualização do corte sugerido"
+                  className="w-full rounded-lg object-cover aspect-[3/4]"
+                />
+              </div>
+            )}
+          </div>
+          {!analysis.generated_image_url && analysis.photo_url && (
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              A imagem do corte não foi gerada. Tente novamente.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Generated image full view if no original */}
+      {analysis.generated_image_url && !analysis.photo_url && (
+        <div className="rounded-xl overflow-hidden shadow-gold">
+          <p className="text-xs text-muted-foreground text-center mb-2">Visualização do Corte Sugerido</p>
+          <img
+            src={analysis.generated_image_url}
+            alt="Visualização do corte sugerido"
+            className="w-full rounded-xl"
+          />
+        </div>
+      )}
 
       {/* Face Analysis Card */}
       <div className="glass-card rounded-xl p-4">
@@ -95,51 +159,51 @@ export default function AnalysisResult({ analysis, onSave, saved }: AnalysisResu
             <Lightbulb className="w-5 h-5 text-primary" />
             <p className="text-sm font-semibold text-foreground">Por que este corte?</p>
           </div>
-          <p className="text-foreground text-sm leading-relaxed">
+          <p className="text-foreground text-sm leading-relaxed whitespace-pre-line">
             {analysis.cut_explanation}
           </p>
         </div>
       )}
 
-      {/* Generated image */}
-      {analysis.generated_image_url && (
-        <div className="rounded-xl overflow-hidden shadow-gold">
-          <p className="text-xs text-muted-foreground text-center mb-2">Visualização do Corte Sugerido</p>
-          <img
-            src={analysis.generated_image_url}
-            alt="Visualização do corte sugerido"
-            className="w-full rounded-xl"
-          />
-        </div>
-      )}
-
       {/* Tips */}
-      {analysis.maintenance_tips && (
+      {tipsDisplay && (
         <div className="glass-card rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Wrench className="w-5 h-5 text-primary" />
             <p className="text-sm font-semibold text-foreground">Dicas de Manutenção</p>
           </div>
-          <p className="text-foreground text-sm leading-relaxed">
-            {analysis.maintenance_tips}
+          <p className="text-foreground text-sm leading-relaxed whitespace-pre-line">
+            {tipsDisplay}
           </p>
         </div>
       )}
 
-      {/* Save */}
-      {onSave && !saved && (
-        <Button
-          onClick={onSave}
-          className="w-full bg-gradient-gold text-primary-foreground hover:opacity-90"
-        >
-          <Save className="w-4 h-4 mr-2" /> Salvar no Histórico
-        </Button>
-      )}
-      {saved && (
-        <p className="text-center text-primary text-sm font-medium">
-          ✓ Salvo no seu histórico
-        </p>
-      )}
+      {/* Actions */}
+      <div className="space-y-2">
+        {onRegenerate && (
+          <Button
+            onClick={onRegenerate}
+            variant="outline"
+            className="w-full border-border text-foreground"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" /> Gerar Novamente
+          </Button>
+        )}
+
+        {onSave && !saved && (
+          <Button
+            onClick={onSave}
+            className="w-full bg-gradient-gold text-primary-foreground hover:opacity-90"
+          >
+            <Save className="w-4 h-4 mr-2" /> Salvar no Histórico
+          </Button>
+        )}
+        {saved && (
+          <p className="text-center text-primary text-sm font-medium">
+            ✓ Salvo no seu histórico
+          </p>
+        )}
+      </div>
     </div>
   );
 }
