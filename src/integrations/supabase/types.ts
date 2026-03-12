@@ -17,43 +17,79 @@ export type Database = {
       analyses: {
         Row: {
           answers: Json
+          barber_level: string | null
+          beard_recommendation: string | null
+          contrast_level: string | null
           created_at: string
+          current_style: string | null
+          cut_difficulty: string | null
           cut_explanation: string | null
           face_shape: string | null
+          fade_type: string | null
+          forehead: string | null
           generated_image_url: string | null
           id: string
+          jaw_shape: string | null
           maintenance_tips: string | null
+          mustache_recommendation: string | null
           photo_url: string | null
+          proportion: string | null
+          recommended_style: string | null
           status: string
           suggested_cut: string | null
+          top_style: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           answers?: Json
+          barber_level?: string | null
+          beard_recommendation?: string | null
+          contrast_level?: string | null
           created_at?: string
+          current_style?: string | null
+          cut_difficulty?: string | null
           cut_explanation?: string | null
           face_shape?: string | null
+          fade_type?: string | null
+          forehead?: string | null
           generated_image_url?: string | null
           id?: string
+          jaw_shape?: string | null
           maintenance_tips?: string | null
+          mustache_recommendation?: string | null
           photo_url?: string | null
+          proportion?: string | null
+          recommended_style?: string | null
           status?: string
           suggested_cut?: string | null
+          top_style?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           answers?: Json
+          barber_level?: string | null
+          beard_recommendation?: string | null
+          contrast_level?: string | null
           created_at?: string
+          current_style?: string | null
+          cut_difficulty?: string | null
           cut_explanation?: string | null
           face_shape?: string | null
+          fade_type?: string | null
+          forehead?: string | null
           generated_image_url?: string | null
           id?: string
+          jaw_shape?: string | null
           maintenance_tips?: string | null
+          mustache_recommendation?: string | null
           photo_url?: string | null
+          proportion?: string | null
+          recommended_style?: string | null
           status?: string
           suggested_cut?: string | null
+          top_style?: string | null
           updated_at?: string
           user_id?: string
         }

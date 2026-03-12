@@ -26,20 +26,38 @@ serve(async (req) => {
       .map(([q, a]) => `${q}: ${a}`)
       .join("\n");
 
-    const analysisPrompt = `Você é um visagista barbeiro profissional especialista em visagismo masculino, harmonização facial e cortes modernos.
+    const analysisPrompt = `Você é um barbeiro visagista profissional especialista em visagismo masculino, consultoria de imagem e estética facial.
 
-Analise a foto do rosto deste cliente e as respostas do questionário abaixo:
+Analise a foto do rosto deste cliente com profundidade total. Considere também as respostas do questionário:
 
 ${answersText}
 
-Com base na foto e nas respostas, forneça:
+Faça uma análise profissional completa avaliando:
+- formato do rosto (oval, redondo, quadrado, retangular, triangular, diamante)
+- formato da mandíbula
+- tamanho da testa
+- proporção entre testa, nariz e queixo
+- simetria do rosto
+- tipo de cabelo atual
+- volume do cabelo
+- linha frontal
+- estilo atual
+- idade aparente
 
-1. **Formato do rosto** (oval, redondo, quadrado, retangular, triangular, diamante, oblong, coração)
-2. **Nome do corte sugerido** - um corte real, executável em barbearia, moderno ou social conforme as preferências
-3. **Explicação** (2-3 frases) de por que este corte harmoniza com o rosto do cliente
-4. **Dicas de manutenção** (3-4 dicas práticas)
+Com base nessa análise, sugira:
+- Corte ideal (real, executável em barbearia)
+- Tipo de fade recomendado
+- Estilo do topo
+- Barba ideal
+- Bigode
+- Dificuldade do corte
+- Nível do barbeiro necessário
 
-Responda APENAS em formato JSON com as chaves: face_shape, suggested_cut, cut_explanation, maintenance_tips`;
+Inclua uma explicação profissional como um barbeiro premium explicaria ao cliente (2-3 frases detalhadas).
+Inclua 4-5 dicas práticas de manutenção.
+
+Responda APENAS em formato JSON com estas chaves:
+face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips`;
 
     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -79,18 +97,40 @@ Responda APENAS em formato JSON com as chaves: face_shape, suggested_cut, cut_ex
     } catch {
       parsed = {
         face_shape: "Não identificado",
+        jaw_shape: "",
+        forehead: "",
+        proportion: "",
+        current_style: "",
+        contrast_level: "",
+        recommended_style: "",
         suggested_cut: "Degradê Médio com Textura",
-        cut_explanation: rawText.slice(0, 300),
+        fade_type: "",
+        top_style: "",
+        beard_recommendation: "",
+        mustache_recommendation: "",
+        cut_difficulty: "",
+        barber_level: "",
+        cut_explanation: rawText.slice(0, 500),
         maintenance_tips: "Retoque a cada 15-20 dias.",
       };
     }
 
     // Step 2: Generate image with the suggested haircut
-    const imagePrompt = `Photorealistic professional barbershop photo. Take this exact person and show them with a ${parsed.suggested_cut} haircut. 
-Keep the same face, skin tone, facial features, age, and identity. 
-Natural lighting, high definition, realistic barbershop result.
-The haircut must look like it was done by a professional barber - clean, precise, and modern.
-Do NOT change the person's identity. Do NOT make it look like art or illustration.`;
+    const imagePrompt = `Fotografia profissional ultra-realista de barbearia premium. 
+Aplique o corte "${parsed.suggested_cut}" com fade tipo "${parsed.fade_type || 'degradê médio'}" e topo "${parsed.top_style || 'texturizado'}".
+${parsed.beard_recommendation ? `Barba: ${parsed.beard_recommendation}.` : ''}
+${parsed.mustache_recommendation ? `Bigode: ${parsed.mustache_recommendation}.` : ''}
+
+REGRAS OBRIGATÓRIAS:
+- Manter EXATAMENTE o mesmo rosto, identidade, pele, idade e características faciais
+- NÃO mudar formato do rosto
+- NÃO transformar em outra pessoa
+- Corte deve parecer real, feito por barbeiro profissional
+- Estilo: foto de barbearia premium, câmera profissional, lente 50mm
+- Iluminação de estúdio, 4K, alta definição
+- Pele natural, sem filtros artísticos
+- SEM cartoon, SEM anime, SEM desenho, SEM ilustração
+- Resultado deve parecer uma foto REAL tirada após o corte`;
 
     const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -143,7 +183,19 @@ Do NOT change the person's identity. Do NOT make it look like art or illustratio
       .from("analyses")
       .update({
         face_shape: parsed.face_shape,
+        jaw_shape: parsed.jaw_shape || null,
+        forehead: parsed.forehead || null,
+        proportion: parsed.proportion || null,
+        current_style: parsed.current_style || null,
+        contrast_level: parsed.contrast_level || null,
+        recommended_style: parsed.recommended_style || null,
         suggested_cut: parsed.suggested_cut,
+        fade_type: parsed.fade_type || null,
+        top_style: parsed.top_style || null,
+        beard_recommendation: parsed.beard_recommendation || null,
+        mustache_recommendation: parsed.mustache_recommendation || null,
+        cut_difficulty: parsed.cut_difficulty || null,
+        barber_level: parsed.barber_level || null,
         cut_explanation: parsed.cut_explanation,
         maintenance_tips: parsed.maintenance_tips,
         generated_image_url: generatedImageUrl,

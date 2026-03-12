@@ -1,38 +1,90 @@
-import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { Scissors, Lightbulb, Wrench, Save } from "lucide-react";
+import { Scissors, Lightbulb, Wrench, Save, User, Layers } from "lucide-react";
+
+interface AnalysisData {
+  face_shape?: string | null;
+  jaw_shape?: string | null;
+  forehead?: string | null;
+  proportion?: string | null;
+  current_style?: string | null;
+  contrast_level?: string | null;
+  recommended_style?: string | null;
+  suggested_cut?: string | null;
+  fade_type?: string | null;
+  top_style?: string | null;
+  beard_recommendation?: string | null;
+  mustache_recommendation?: string | null;
+  cut_difficulty?: string | null;
+  barber_level?: string | null;
+  cut_explanation?: string | null;
+  maintenance_tips?: string | null;
+  generated_image_url?: string | null;
+}
 
 interface AnalysisResultProps {
-  analysis: Tables<"analyses">;
+  analysis: AnalysisData;
   onSave?: () => void;
   saved?: boolean;
 }
 
+function DetailRow({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="flex justify-between items-start py-1.5 border-b border-border/30 last:border-0">
+      <span className="text-muted-foreground text-sm">{label}</span>
+      <span className="text-foreground text-sm font-medium text-right max-w-[60%]">{value}</span>
+    </div>
+  );
+}
+
 export default function AnalysisResult({ analysis, onSave, saved }: AnalysisResultProps) {
   return (
-    <div className="animate-slide-up space-y-6">
+    <div className="animate-slide-up space-y-5">
       <h2 className="text-2xl font-display font-bold text-gradient-gold text-center">
-        Resultado da Análise
+        Resultado da Análise Visagista
       </h2>
 
-      {/* Face shape */}
-      {analysis.face_shape && (
+      {/* Face Analysis Card */}
+      <div className="glass-card rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <User className="w-5 h-5 text-primary" />
+          <p className="text-sm font-semibold text-foreground">Análise Facial</p>
+        </div>
+        <DetailRow label="Formato do Rosto" value={analysis.face_shape} />
+        <DetailRow label="Mandíbula" value={analysis.jaw_shape} />
+        <DetailRow label="Testa" value={analysis.forehead} />
+        <DetailRow label="Proporção" value={analysis.proportion} />
+        <DetailRow label="Estilo Atual" value={analysis.current_style} />
+        <DetailRow label="Nível de Contraste" value={analysis.contrast_level} />
+      </div>
+
+      {/* Recommended Cut Card */}
+      {analysis.suggested_cut && (
         <div className="glass-card rounded-xl p-4">
-          <p className="text-sm text-muted-foreground mb-1">Formato do Rosto</p>
-          <p className="text-foreground font-semibold">{analysis.face_shape}</p>
+          <div className="flex items-center gap-2 mb-3">
+            <Scissors className="w-5 h-5 text-primary" />
+            <p className="text-sm font-semibold text-foreground">Corte Recomendado</p>
+          </div>
+          <p className="text-foreground font-display text-lg font-bold mb-3">
+            {analysis.suggested_cut}
+          </p>
+          <DetailRow label="Estilo Recomendado" value={analysis.recommended_style} />
+          <DetailRow label="Tipo de Fade" value={analysis.fade_type} />
+          <DetailRow label="Topo" value={analysis.top_style} />
+          <DetailRow label="Barba Ideal" value={analysis.beard_recommendation} />
+          <DetailRow label="Bigode" value={analysis.mustache_recommendation} />
         </div>
       )}
 
-      {/* Suggested cut */}
-      {analysis.suggested_cut && (
+      {/* Difficulty Card */}
+      {(analysis.cut_difficulty || analysis.barber_level) && (
         <div className="glass-card rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Scissors className="w-5 h-5 text-primary" />
-            <p className="text-sm text-muted-foreground">Corte Sugerido</p>
+          <div className="flex items-center gap-2 mb-3">
+            <Layers className="w-5 h-5 text-primary" />
+            <p className="text-sm font-semibold text-foreground">Nível Técnico</p>
           </div>
-          <p className="text-foreground font-display text-lg font-semibold">
-            {analysis.suggested_cut}
-          </p>
+          <DetailRow label="Dificuldade do Corte" value={analysis.cut_difficulty} />
+          <DetailRow label="Nível do Barbeiro" value={analysis.barber_level} />
         </div>
       )}
 
@@ -41,7 +93,7 @@ export default function AnalysisResult({ analysis, onSave, saved }: AnalysisResu
         <div className="glass-card rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Lightbulb className="w-5 h-5 text-primary" />
-            <p className="text-sm text-muted-foreground">Por que este corte?</p>
+            <p className="text-sm font-semibold text-foreground">Por que este corte?</p>
           </div>
           <p className="text-foreground text-sm leading-relaxed">
             {analysis.cut_explanation}
@@ -52,10 +104,11 @@ export default function AnalysisResult({ analysis, onSave, saved }: AnalysisResu
       {/* Generated image */}
       {analysis.generated_image_url && (
         <div className="rounded-xl overflow-hidden shadow-gold">
+          <p className="text-xs text-muted-foreground text-center mb-2">Visualização do Corte Sugerido</p>
           <img
             src={analysis.generated_image_url}
             alt="Visualização do corte sugerido"
-            className="w-full"
+            className="w-full rounded-xl"
           />
         </div>
       )}
@@ -65,7 +118,7 @@ export default function AnalysisResult({ analysis, onSave, saved }: AnalysisResu
         <div className="glass-card rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Wrench className="w-5 h-5 text-primary" />
-            <p className="text-sm text-muted-foreground">Dicas de Manutenção</p>
+            <p className="text-sm font-semibold text-foreground">Dicas de Manutenção</p>
           </div>
           <p className="text-foreground text-sm leading-relaxed">
             {analysis.maintenance_tips}
