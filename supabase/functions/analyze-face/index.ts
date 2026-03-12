@@ -26,20 +26,38 @@ serve(async (req) => {
       .map(([q, a]) => `${q}: ${a}`)
       .join("\n");
 
-    const analysisPrompt = `Você é um visagista barbeiro profissional especialista em visagismo masculino, harmonização facial e cortes modernos.
+    const analysisPrompt = `Você é um barbeiro visagista profissional especialista em visagismo masculino, consultoria de imagem e estética facial.
 
-Analise a foto do rosto deste cliente e as respostas do questionário abaixo:
+Analise a foto do rosto deste cliente com profundidade total. Considere também as respostas do questionário:
 
 ${answersText}
 
-Com base na foto e nas respostas, forneça:
+Faça uma análise profissional completa avaliando:
+- formato do rosto (oval, redondo, quadrado, retangular, triangular, diamante)
+- formato da mandíbula
+- tamanho da testa
+- proporção entre testa, nariz e queixo
+- simetria do rosto
+- tipo de cabelo atual
+- volume do cabelo
+- linha frontal
+- estilo atual
+- idade aparente
 
-1. **Formato do rosto** (oval, redondo, quadrado, retangular, triangular, diamante, oblong, coração)
-2. **Nome do corte sugerido** - um corte real, executável em barbearia, moderno ou social conforme as preferências
-3. **Explicação** (2-3 frases) de por que este corte harmoniza com o rosto do cliente
-4. **Dicas de manutenção** (3-4 dicas práticas)
+Com base nessa análise, sugira:
+- Corte ideal (real, executável em barbearia)
+- Tipo de fade recomendado
+- Estilo do topo
+- Barba ideal
+- Bigode
+- Dificuldade do corte
+- Nível do barbeiro necessário
 
-Responda APENAS em formato JSON com as chaves: face_shape, suggested_cut, cut_explanation, maintenance_tips`;
+Inclua uma explicação profissional como um barbeiro premium explicaria ao cliente (2-3 frases detalhadas).
+Inclua 4-5 dicas práticas de manutenção.
+
+Responda APENAS em formato JSON com estas chaves:
+face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips`;
 
     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
