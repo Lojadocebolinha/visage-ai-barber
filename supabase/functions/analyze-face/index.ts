@@ -97,8 +97,20 @@ face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, reco
     } catch {
       parsed = {
         face_shape: "Não identificado",
+        jaw_shape: "",
+        forehead: "",
+        proportion: "",
+        current_style: "",
+        contrast_level: "",
+        recommended_style: "",
         suggested_cut: "Degradê Médio com Textura",
-        cut_explanation: rawText.slice(0, 300),
+        fade_type: "",
+        top_style: "",
+        beard_recommendation: "",
+        mustache_recommendation: "",
+        cut_difficulty: "",
+        barber_level: "",
+        cut_explanation: rawText.slice(0, 500),
         maintenance_tips: "Retoque a cada 15-20 dias.",
       };
     }
