@@ -177,7 +177,11 @@ export default function ClientDashboard() {
 
         {step === "result" && analysis && (
           <div>
-            <AnalysisResult analysis={analysis} onSave={handleSave} />
+            <AnalysisResult
+              analysis={analysis}
+              onSave={handleSave}
+              onRegenerate={startNew}
+            />
             <Button
               variant="outline"
               onClick={startNew}
