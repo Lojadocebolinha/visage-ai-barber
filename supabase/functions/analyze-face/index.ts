@@ -7,6 +7,180 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+type AnalysisFields = {
+  face_shape?: string;
+  jaw_shape?: string;
+  forehead?: string;
+  proportion?: string;
+  current_style?: string;
+  contrast_level?: string;
+  recommended_style?: string;
+  suggested_cut?: string;
+  fade_type?: string;
+  top_style?: string;
+  beard_recommendation?: string;
+  mustache_recommendation?: string;
+  cut_difficulty?: string;
+  barber_level?: string;
+  cut_explanation?: string;
+  maintenance_tips?: string | string[];
+};
+
+function normalizeFaceShape(value?: string): string {
+  const text = (value || "").toLowerCase();
+  if (text.includes("oval")) return "oval";
+  if (text.includes("redond") || text.includes("round")) return "round";
+  if (text.includes("quadrad") || text.includes("square")) return "square";
+  if (text.includes("triang")) return "triangle";
+  if (text.includes("diam")) return "diamond";
+  if (text.includes("retang") || text.includes("rectang")) return "rectangular";
+  return "oval";
+}
+
+function cleanBase64(input: string): string {
+  let cleaned = (input || "").trim();
+  if (cleaned.includes(",") && cleaned.startsWith("data:")) {
+    cleaned = cleaned.split(",")[1];
+  }
+  cleaned = cleaned.replace(/\s/g, "");
+  return cleaned;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+}
+
+function extractImageDataUrl(payload: any): string | null {
+  const fromChoices = payload?.choices?.[0]?.message;
+
+  // OpenAI-compatible image path
+  const choiceImage = fromChoices?.images?.[0]?.image_url?.url;
+  if (typeof choiceImage === "string" && choiceImage.startsWith("data:image/")) {
+    return choiceImage;
+  }
+
+  // Some gateways may return image in content array
+  if (Array.isArray(fromChoices?.content)) {
+    for (const part of fromChoices.content) {
+      if (part?.image_url?.url && typeof part.image_url.url === "string") {
+        const url = part.image_url.url;
+        if (url.startsWith("data:image/")) return url;
+      }
+      if (part?.inline_data?.data && part?.inline_data?.mime_type) {
+        return `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`;
+      }
+      if (part?.inlineData?.data && part?.inlineData?.mimeType) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+  }
+
+  // Gemini generateContent path
+  const parts = payload?.candidates?.[0]?.content?.parts;
+  if (Array.isArray(parts)) {
+    for (const part of parts) {
+      if (part?.inlineData?.data && part?.inlineData?.mimeType) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+      if (part?.inline_data?.data && part?.inline_data?.mime_type) {
+        return `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`;
+      }
+    }
+  }
+
+  // OpenAI image generation fallback path
+  const b64 = payload?.data?.[0]?.b64_json;
+  if (typeof b64 === "string") {
+    return `data:image/png;base64,${b64}`;
+  }
+
+  return null;
+}
+
+async function callImageModel(
+  LOVABLE_API_KEY: string,
+  model: string,
+  prompt: string,
+  mimeType: string,
+  base64Image: string
+): Promise<string | null> {
+  const multimodalPayload = {
+    model,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+        ],
+      },
+    ],
+    modalities: ["image", "text"],
+    responseModalities: ["TEXT", "IMAGE"],
+  };
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(multimodalPayload),
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+    return extractImageDataUrl(data);
+  }
+
+  // Fallback: Gemini-native shape via AI Gateway generateContent
+  const fallbackResponse = await fetch(
+    `https://ai.gateway.lovable.dev/v1/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType,
+                  data: base64Image,
+                },
+              },
+            ],
+          },
+        ],
+        responseModalities: ["TEXT", "IMAGE"],
+      }),
+    }
+  );
+
+  if (!fallbackResponse.ok) {
+    const body = await fallbackResponse.text();
+    console.error("Image model failed:", fallbackResponse.status, body);
+    return null;
+  }
+
+  const fallbackData = await fallbackResponse.json();
+  return extractImageDataUrl(fallbackData);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -21,53 +195,35 @@ serve(async (req) => {
     const { analysisId, photoUrl, answers } = await req.json();
     if (!analysisId || !photoUrl) throw new Error("Missing analysisId or photoUrl");
 
-    console.log("Starting analysis for:", analysisId);
-
-    // Step 1: Download the photo and convert to base64 for the AI
     const photoResponse = await fetch(photoUrl);
-    if (!photoResponse.ok) throw new Error("Failed to download photo");
-    const photoBlob = await photoResponse.arrayBuffer();
-    const photoBase64 = btoa(String.fromCharCode(...new Uint8Array(photoBlob)));
-    const photoMimeType = photoResponse.headers.get("content-type") || "image/jpeg";
+    if (!photoResponse.ok) throw new Error("Failed to fetch user photo");
 
-    console.log("Photo downloaded, size:", photoBlob.byteLength, "mime:", photoMimeType);
+    const mimeType = photoResponse.headers.get("content-type") || "image/jpeg";
+    const base64Photo = cleanBase64(arrayBufferToBase64(await photoResponse.arrayBuffer()));
 
-    // Step 2: Analyze face with text model
     const answersText = Object.entries(answers || {})
       .map(([q, a]) => `${q}: ${a}`)
       .join("\n");
 
-    const analysisPrompt = `Você é um barbeiro visagista profissional especialista em visagismo masculino.
+    const analysisPrompt = `You are a professional male visagism barber AI.
 
-Analise a foto do rosto deste cliente com profundidade total. Considere as respostas do questionário:
+When the user sends photo and questionnaire answers you must automatically:
+1 analyze the face
+2 detect face shape
+3 suggest best haircut
+4 suggest beard
 
+Face analysis:
+detect face shape, jaw, forehead, proportion, hair type, beard, style.
+
+Face shape must be one: oval, round, square, triangle, diamond, rectangular.
+
+Haircut suggestion must include: cut name, fade type, top size, beard style, style type.
+
+Questionnaire answers:
 ${answersText}
 
-Faça uma análise profissional completa avaliando:
-- formato do rosto (oval, redondo, quadrado, retangular, triangular, diamante)
-- formato da mandíbula
-- tamanho da testa
-- proporção entre testa, nariz e queixo
-- simetria do rosto
-- tipo de cabelo atual
-- volume do cabelo
-- linha frontal
-- estilo atual
-- idade aparente
-
-Com base nessa análise, sugira:
-- Corte ideal (real, executável em barbearia)
-- Tipo de fade recomendado
-- Estilo do topo
-- Barba ideal
-- Bigode
-- Dificuldade do corte
-- Nível do barbeiro necessário
-
-Inclua uma explicação profissional como um barbeiro premium explicaria ao cliente (2-3 frases detalhadas).
-Inclua 4-5 dicas práticas de manutenção.
-
-Responda APENAS em formato JSON com estas chaves:
+Return ONLY valid JSON with keys:
 face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips`;
 
     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -83,7 +239,7 @@ face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, reco
             role: "user",
             content: [
               { type: "text", text: analysisPrompt },
-              { type: "image_url", image_url: { url: `data:${photoMimeType};base64,${photoBase64}` } },
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Photo}` } },
             ],
           },
         ],
@@ -92,8 +248,6 @@ face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, reco
 
     if (!analysisResponse.ok) {
       const status = analysisResponse.status;
-      const body = await analysisResponse.text();
-      console.error("Analysis API error:", status, body);
       if (status === 429) throw new Error("RATE_LIMITED");
       if (status === 402) throw new Error("PAYMENT_REQUIRED");
       throw new Error(`Analysis failed: ${status}`);
@@ -101,185 +255,121 @@ face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, reco
 
     const analysisData = await analysisResponse.json();
     const rawText = analysisData.choices?.[0]?.message?.content || "";
-    console.log("Analysis raw text length:", rawText.length);
 
-    // Parse JSON from response
-    let parsed: any;
+    let parsed: AnalysisFields = {};
     try {
-      const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, rawText];
-      parsed = JSON.parse(jsonMatch[1].trim());
+      const match = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const jsonText = (match?.[1] || rawText).trim();
+      parsed = JSON.parse(jsonText);
     } catch {
-      console.error("Failed to parse analysis JSON, using fallback");
       parsed = {
-        face_shape: "Não identificado",
-        suggested_cut: "Degradê Médio com Textura",
-        cut_explanation: rawText.slice(0, 500),
-        maintenance_tips: "Retoque a cada 15-20 dias.",
+        face_shape: "oval",
+        suggested_cut: "Low Fade Texturizado",
+        beard_recommendation: "Barba curta alinhada",
+        cut_explanation: rawText.slice(0, 700) || "Corte equilibrado para valorizar suas proporções faciais.",
+        maintenance_tips: ["Retoque a cada 2-3 semanas."],
       };
     }
 
-    console.log("Parsed analysis:", parsed.face_shape, parsed.suggested_cut);
+    parsed.face_shape = normalizeFaceShape(parsed.face_shape);
 
-    // Step 3: Generate image with the suggested haircut
-    const imagePrompt = `You are a professional barber photo editor. Apply the following haircut to this person's photo.
+    const imagePrompt = `You are a professional barber visagism AI.
 
-HAIRCUT TO APPLY:
-- Cut: ${parsed.suggested_cut}
-- Fade: ${parsed.fade_type || 'mid fade'}
-- Top: ${parsed.top_style || 'textured'}
-${parsed.beard_recommendation ? `- Beard: ${parsed.beard_recommendation}` : ''}
-${parsed.mustache_recommendation ? `- Mustache: ${parsed.mustache_recommendation}` : ''}
+Analyze the face and generate a new realistic image of the same person.
 
-MANDATORY RULES:
-- Keep the EXACT SAME face, identity, skin color, age, and facial features
-- DO NOT change the face shape or create a different person
-- Only change the hair and beard/mustache
-- The result must look like a REAL professional barbershop photo
-- Studio lighting, professional camera, 50mm lens, 4K quality
-- Natural skin texture, no filters
-- NO cartoon, NO anime, NO drawing, NO illustration
-- The result must look like a real photo taken after the haircut`;
+Keep same face.
+Keep same identity.
+Only change hair and beard.
 
-    console.log("Generating image with model google/gemini-3.1-flash-image-preview");
+Apply best haircut: ${parsed.suggested_cut || "Low Fade"}.
+Apply beard style: ${parsed.beard_recommendation || "Short beard"}.
+Apply fade: ${parsed.fade_type || "Low fade"}.
+Apply top style: ${parsed.top_style || "Textured top"}.
 
-    const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: imagePrompt },
-              { type: "image_url", image_url: { url: `data:${photoMimeType};base64,${photoBase64}` } },
-            ],
-          },
-        ],
-        modalities: ["image", "text"],
-      }),
-    });
+Realistic photo.
+Barbershop.
+Studio lighting.
+4k.
+50mm lens.
+Natural skin.
+High quality.
+
+No cartoon.
+No anime.
+No drawing.
+No different face.
+No different person.`;
+
+    let generatedDataUrl: string | null = await callImageModel(
+      LOVABLE_API_KEY,
+      "google/gemini-3.1-flash-image-preview",
+      imagePrompt,
+      mimeType,
+      base64Photo
+    );
+
+    if (!generatedDataUrl) {
+      generatedDataUrl = await callImageModel(
+        LOVABLE_API_KEY,
+        "google/gemini-1.5-flash-image-preview",
+        imagePrompt,
+        mimeType,
+        base64Photo
+      );
+    }
 
     let generatedImageUrl: string | null = null;
 
-    if (imageResponse.ok) {
-      const imageData = await imageResponse.json();
-      console.log("Image response keys:", Object.keys(imageData));
-      console.log("Image choices count:", imageData.choices?.length);
+    if (generatedDataUrl) {
+      const rawB64 = cleanBase64(generatedDataUrl);
+      const imageBytes = Uint8Array.from(atob(rawB64), (c) => c.charCodeAt(0));
+      const fileName = `generated/${analysisId}.png`;
 
-      if (imageData.choices?.[0]?.message) {
-        const msg = imageData.choices[0].message;
-        console.log("Message keys:", Object.keys(msg));
-        console.log("Has images array:", !!msg.images, "length:", msg.images?.length);
-        console.log("Message content preview:", (msg.content || "").slice(0, 200));
+      const { error: uploadError } = await supabase.storage
+        .from("analysis-photos")
+        .upload(fileName, imageBytes, { contentType: "image/png", upsert: true });
 
-        // Try multiple paths to find the generated image
-        let base64Image: string | null = null;
-
-        // Path 1: images array (Lovable gateway format)
-        if (msg.images && msg.images.length > 0) {
-          base64Image = msg.images[0]?.image_url?.url || msg.images[0]?.url || null;
-          console.log("Found image via images array, length:", base64Image?.length);
-        }
-
-        // Path 2: content parts with image
-        if (!base64Image && Array.isArray(msg.content)) {
-          for (const part of msg.content) {
-            if (part.type === "image_url" && part.image_url?.url) {
-              base64Image = part.image_url.url;
-              console.log("Found image via content parts");
-              break;
-            }
-          }
-        }
-
-        // Path 3: inline_data in content
-        if (!base64Image && msg.content && typeof msg.content === "string") {
-          const imgMatch = msg.content.match(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]+/);
-          if (imgMatch) {
-            base64Image = imgMatch[0];
-            console.log("Found image via regex in content");
-          }
-        }
-
-        if (base64Image) {
-          console.log("Processing base64 image, total length:", base64Image.length);
-
-          // Clean base64 data
-          let base64Data = base64Image;
-          if (base64Data.includes(",")) {
-            base64Data = base64Data.split(",")[1];
-          }
-
-          try {
-            const binaryData = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
-            const fileName = `generated/${analysisId}.png`;
-
-            console.log("Uploading generated image, size:", binaryData.byteLength);
-
-            const { error: uploadError } = await supabase.storage
-              .from("analysis-photos")
-              .upload(fileName, binaryData, { contentType: "image/png", upsert: true });
-
-            if (uploadError) {
-              console.error("Upload error:", uploadError.message);
-            } else {
-              const { data: urlData } = supabase.storage
-                .from("analysis-photos")
-                .getPublicUrl(fileName);
-              generatedImageUrl = urlData.publicUrl;
-              console.log("Generated image uploaded:", generatedImageUrl);
-            }
-          } catch (e) {
-            console.error("Base64 decode/upload error:", e);
-          }
-        } else {
-          console.error("No image found in response. Full message:", JSON.stringify(msg).slice(0, 500));
-        }
+      if (uploadError) {
+        console.error("Generated image upload error:", uploadError.message);
+      } else {
+        const { data: urlData } = supabase.storage.from("analysis-photos").getPublicUrl(fileName);
+        generatedImageUrl = urlData.publicUrl;
       }
-    } else {
-      const errBody = await imageResponse.text();
-      console.error("Image generation failed:", imageResponse.status, errBody);
     }
 
-    // Step 4: Update analysis record in DB
-    const maintenanceTips = Array.isArray(parsed.maintenance_tips)
+    if (!generatedImageUrl) {
+      throw new Error("IMAGE_GENERATION_FAILED");
+    }
+
+    const tips = Array.isArray(parsed.maintenance_tips)
       ? parsed.maintenance_tips.join("\n• ")
-      : parsed.maintenance_tips || "";
+      : (parsed.maintenance_tips || "");
 
     const { error: updateError } = await supabase
       .from("analyses")
       .update({
-        face_shape: parsed.face_shape,
+        face_shape: parsed.face_shape || null,
         jaw_shape: parsed.jaw_shape || null,
         forehead: parsed.forehead || null,
         proportion: parsed.proportion || null,
         current_style: parsed.current_style || null,
         contrast_level: parsed.contrast_level || null,
         recommended_style: parsed.recommended_style || null,
-        suggested_cut: parsed.suggested_cut,
+        suggested_cut: parsed.suggested_cut || null,
         fade_type: parsed.fade_type || null,
         top_style: parsed.top_style || null,
         beard_recommendation: parsed.beard_recommendation || null,
         mustache_recommendation: parsed.mustache_recommendation || null,
         cut_difficulty: parsed.cut_difficulty || null,
         barber_level: parsed.barber_level || null,
-        cut_explanation: parsed.cut_explanation,
-        maintenance_tips: maintenanceTips,
+        cut_explanation: parsed.cut_explanation || null,
+        maintenance_tips: tips || null,
         generated_image_url: generatedImageUrl,
         status: "completed",
       })
       .eq("id", analysisId);
 
-    if (updateError) {
-      console.error("DB update error:", updateError.message);
-      throw updateError;
-    }
-
-    console.log("Analysis complete. Image generated:", !!generatedImageUrl);
+    if (updateError) throw updateError;
 
     return new Response(
       JSON.stringify({
@@ -287,15 +377,19 @@ MANDATORY RULES:
         face_shape: parsed.face_shape,
         suggested_cut: parsed.suggested_cut,
         cut_explanation: parsed.cut_explanation,
-        maintenance_tips: maintenanceTips,
+        maintenance_tips: tips,
         generated_image_url: generatedImageUrl,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   } catch (e: any) {
-    console.error("analyze-face error:", e);
     const msg = e.message || "Unknown error";
-    const status = msg === "RATE_LIMITED" ? 429 : msg === "PAYMENT_REQUIRED" ? 402 : 500;
+    console.error("analyze-face error:", msg);
+    const status =
+      msg === "RATE_LIMITED" ? 429 : msg === "PAYMENT_REQUIRED" ? 402 : msg === "IMAGE_GENERATION_FAILED" ? 500 : 500;
+
     return new Response(JSON.stringify({ error: msg }), {
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
