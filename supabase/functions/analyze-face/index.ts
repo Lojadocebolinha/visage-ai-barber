@@ -116,11 +116,21 @@ face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, reco
     }
 
     // Step 2: Generate image with the suggested haircut
-    const imagePrompt = `Photorealistic professional barbershop photo. Take this exact person and show them with a ${parsed.suggested_cut} haircut. 
-Keep the same face, skin tone, facial features, age, and identity. 
-Natural lighting, high definition, realistic barbershop result.
-The haircut must look like it was done by a professional barber - clean, precise, and modern.
-Do NOT change the person's identity. Do NOT make it look like art or illustration.`;
+    const imagePrompt = `Fotografia profissional ultra-realista de barbearia premium. 
+Aplique o corte "${parsed.suggested_cut}" com fade tipo "${parsed.fade_type || 'degradê médio'}" e topo "${parsed.top_style || 'texturizado'}".
+${parsed.beard_recommendation ? `Barba: ${parsed.beard_recommendation}.` : ''}
+${parsed.mustache_recommendation ? `Bigode: ${parsed.mustache_recommendation}.` : ''}
+
+REGRAS OBRIGATÓRIAS:
+- Manter EXATAMENTE o mesmo rosto, identidade, pele, idade e características faciais
+- NÃO mudar formato do rosto
+- NÃO transformar em outra pessoa
+- Corte deve parecer real, feito por barbeiro profissional
+- Estilo: foto de barbearia premium, câmera profissional, lente 50mm
+- Iluminação de estúdio, 4K, alta definição
+- Pele natural, sem filtros artísticos
+- SEM cartoon, SEM anime, SEM desenho, SEM ilustração
+- Resultado deve parecer uma foto REAL tirada após o corte`;
 
     const imageResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
