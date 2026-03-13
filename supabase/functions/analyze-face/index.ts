@@ -130,6 +130,7 @@ async function callImageModel(
       },
     ],
     modalities: ["image", "text"],
+    responseModalities: ["TEXT", "IMAGE"],
   };
 
   console.log("Calling image model:", model);
