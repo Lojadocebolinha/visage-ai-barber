@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import PreAnalysisForm from "@/components/PreAnalysisForm";
 import PhotoUpload from "@/components/PhotoUpload";
 import AnalysisResult from "@/components/AnalysisResult";
+import CreditsDisplay from "@/components/CreditsDisplay";
 import { Tables } from "@/integrations/supabase/types";
 import { Scissors, History, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -174,6 +175,8 @@ export default function ClientDashboard() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-8">
+        <CreditsDisplay />
+
         {step === "questionnaire" && (
           <div>
             <h2 className="text-2xl font-display font-bold text-foreground mb-2">Pré-Análise</h2>

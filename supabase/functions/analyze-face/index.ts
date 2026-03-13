@@ -224,39 +224,55 @@ function fallbackCutFromAnswers(answers: Record<string, unknown>, seed: string):
   const change = toLower(answers.change);
   const hairloss = toLower(answers.hairloss);
 
+    const allCuts = [
+    "Mid Fade",
+    "Low Fade",
+    "High Fade",
+    "Taper",
+    "Burst Fade",
+    "Social Cut",
+    "Scissor Cut",
+    "Buzz Cut",
+    "Crew Cut",
+    "Mohawk",
+    "Classic Cut",
+    "Modern Cut",
+    "Machine Cut #1",
+    "Machine Cut #2",
+    "Machine Cut #3",
+    "Machine Cut #4",
+    "Machine Cut #5",
+  ];
+
   const modernCuts = [
-    "Mid Fade with Textured Top",
-    "High Fade Crop",
-    "Burst Fade with Curly Top",
-    "Taper Fade Quiff",
-    "Modern Crew Cut",
+    "Mid Fade",
+    "High Fade",
+    "Burst Fade",
+    "Taper",
+    "Modern Cut",
   ];
 
   const classicCuts = [
-    "Social Cut with Scissor Finish",
-    "Classic Taper",
-    "Layered Scissor Cut",
-    "Low Fade Classic",
-    "Crew Cut #3",
+    "Social Cut",
+    "Classic Cut",
+    "Scissor Cut",
+    "Low Fade",
+    "Crew Cut",
   ];
 
+  let possibleCuts = [...allCuts];
+
   if (maintenance.includes("sim") && hairloss.includes("sim")) {
-    return pickSeededOption(seed, ["Buzz Cut #2", "Crew Cut #2 with Low Taper", "Machine #3 Classic"]);
+    possibleCuts = ["Buzz Cut", "Crew Cut", "Machine Cut #3"];
+  } else if (maintenance.includes("sim")) {
+    possibleCuts = ["Crew Cut", "Low Fade", "Buzz Cut", "Taper"];
+  } else if (formal.includes("sim") && !change.includes("sim")) {
+    possibleCuts = classicCuts;
+  } else if (style.includes("moderno") || change.includes("sim")) {
+    possibleCuts = modernCuts;
   }
 
-  if (maintenance.includes("sim")) {
-    return pickSeededOption(seed, ["Crew Cut", "Low Fade #3", "Buzz Cut #3", "Taper Fade #4"]);
-  }
-
-  if (formal.includes("sim") && !change.includes("sim")) {
-    return pickSeededOption(seed, classicCuts);
-  }
-
-  if (style.includes("moderno") || change.includes("sim")) {
-    return pickSeededOption(seed, modernCuts);
-  }
-
-  return pickSeededOption(seed, [...classicCuts, ...modernCuts]);
+  return pickSeededOption(seed, possibleCuts);
 }
 
 function getBeardEditingRules(answers: Record<string, unknown>, parsed: AnalysisFields): string {
@@ -316,16 +332,6 @@ serve(async (req) => {
 
     const mimeType = photoResponse.headers.get("content-type") || "image/jpeg";
     const base64Photo = cleanBase64(arrayBufferToBase64(await photoResponse.arrayBuffer()));
-
-    const normalizedAnswers = (answers || {}) as Record<string, unknown>;
-    const answersText = Object.entries(normalizedAnswers)
-      .map(([q, a]) => `${q}: ${a}`)
-      .join("\n");
-
-    const preferenceHints = buildPreferenceHints(normalizedAnswers)
-      .map((hint) => `- ${hint}`)
-      .join("\n");
-
     const analysisPrompt = `You are a professional barber and visagist AI.
 
 Analyze the uploaded photo and the questionnaire answers to select the best professional haircut for this exact person.
@@ -343,7 +349,7 @@ MANDATORY PROFESSIONAL ANALYSIS:
 HAIRCUT SELECTION RULES:
 - Choose haircut professionally from facial/hair evidence + form preferences.
 - Do NOT always choose the same haircut.
-- Allowed styles include (not limited to): mid fade, low fade, high fade, taper fade, burst fade, social cut, scissor cut, layered cut, buzz cut, crew cut, mohawk, classic, modern, textured, machine 1-5.
+- Allowed styles include (not limited to): mid fade, low fade, high fade, taper, burst fade, social, scissor cut, buzz cut, crew cut, mohawk, classic, modern, machine 1 2 3 4 5.
 - Explain why the chosen style fits this person.
 
 Questionnaire answers:
@@ -411,39 +417,47 @@ For maintenance_tips, return an array of short strings.`;
     const topStyle = parsed.top_style || "Maintain natural texture";
     const beardRules = getBeardEditingRules(normalizedAnswers, parsed);
 
-    const imagePrompt = `Professional barber visagism image editing.
+    const imagePrompt = `You are a professional barber visagist AI. Your task is to perform image-to-image editing to apply a new haircut to the person in the uploaded photo, strictly following the rules below.
 
-TARGET STYLE: ${recommendedCut}
+TARGET HAIRCUT STYLE: ${recommendedCut}
 
-MANDATORY RULES:
-- Use the uploaded image as the only reference.
-- This is image-to-image editing.
-- Do NOT generate a new person.
-- Do NOT change identity.
-- Do NOT replace the face.
-- Keep 100% of original facial structure.
-- Keep same eyes, nose, mouth, skin color, age and gender.
-- Keep the exact same person.
+MANDATORY IMAGE EDITING RULES:
+- Use the uploaded photo as the base for all edits.
+- This is image-to-image editing; DO NOT generate a new image from scratch.
+- Preserve the original person's identity 100%. This includes:
+  - NOT generating a new face.
+  - Keeping the exact same eyes, nose, mouth, and overall facial structure.
+  - Maintaining the original skin color and tone.
+  - Retaining the original age and gender of the person.
+- The output image MUST be a realistic photo, not an artistic rendering or cartoon.
+- Maintain the same angle, lighting conditions, and background as the original photo.
 
-FACIAL HAIR RULES:
+HAIR EDITING RULES:
+- Change ONLY the hair. Focus on applying the TARGET HAIRCUT STYLE.
+- Keep the natural hair texture and natural hair color of the person, unless the chosen style explicitly requires a subtle, realistic adjustment (e.g., a slight tone enhancement for realism).
+- The haircut must be a realistic barber haircut, as if performed by a professional.
+- The haircut selection is based on the analysis context (face shape, hair type, form answers, style preference).
+- Ensure the chosen style is dynamically applied, avoiding repetitive results.
+- Allowed styles include: mid fade, low fade, high fade, taper, burst fade, social, scissor cut, buzz cut, crew cut, mohawk, classic, modern, machine 1 2 3 4 5.
+
+BEARD EDITING RULES:
 ${beardRules}
 
-IMAGE RULES:
-- Same angle as original photo.
-- Same lighting.
-- Same background.
-- Same person.
-- Front portrait.
+ANALYSIS CONTEXT FOR HAIRCUT SELECTION:
+- Face Shape: ${parsed.face_shape || "unknown"}
+- Hair Type: ${parsed.hair_type || "unknown"}
+- Hair Texture: ${parsed.hair_texture || "unknown"}
+- Hair Volume: ${parsed.hair_volume || "unknown"}
+- Forehead: ${parsed.forehead_size || parsed.forehead || "unknown"}
+- Jaw: ${parsed.jaw_shape || "unknown"}
+- Beard Presence: ${parsed.beard_presence || "unknown"}
+- Preferred Fade: ${fadeStyle}
+- Preferred Top Style: ${topStyle}
+- Beard Recommendation Context: ${beardStyle}
 
-BARBER EXECUTION RULES:
-- Change only hair unless beard adjustment is explicitly needed.
-- Keep natural hair texture and natural hair color unless needed for realism.
-- Keep realistic professional barbershop result.
-- Respect user questionnaire preferences.
-- Analysis context: face shape (${parsed.face_shape || "unknown"}), hair type (${parsed.hair_type || "unknown"}), hair texture (${parsed.hair_texture || "unknown"}), hair volume (${parsed.hair_volume || "unknown"}), forehead (${parsed.forehead_size || parsed.forehead || "unknown"}), jaw (${parsed.jaw_shape || "unknown"}), beard (${parsed.beard_presence || "unknown"}).
-- Preferred fade: ${fadeStyle}.
-- Preferred top style: ${topStyle}.
-- Beard recommendation context: ${beardStyle}.`;
+Respect all user questionnaire preferences provided in the analysis phase.
+
+Produce a high-quality, realistic image reflecting the new haircut.
 
     let generatedDataUrl: string | null = await callImageModel(
       LOVABLE_API_KEY,

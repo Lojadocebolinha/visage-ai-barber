@@ -2,17 +2,19 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
-import { Scissors, Users, BarChart3, LogOut, Clock } from "lucide-react";
+import { Scissors, Users, BarChart3, LogOut, Clock, Settings, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import AdminUserManagement from "@/components/AdminUserManagement";
+import AdminAISettings from "@/components/AdminAISettings";
 
 export default function AdminDashboard() {
   const { signOut } = useAuth();
   const [analyses, setAnalyses] = useState<Tables<"analyses">[]>([]);
   const [profiles, setProfiles] = useState<Tables<"profiles">[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"overview" | "clients" | "analyses">("overview");
+  const [tab, setTab] = useState<"overview" | "clients" | "analyses" | "users" | "settings" | "usage">("overview");
 
   useEffect(() => {
     Promise.all([
@@ -59,7 +61,7 @@ export default function AdminDashboard() {
         </Button>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-5xl mx-auto px-4 py-8">
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {stats.map((s) => (
@@ -78,18 +80,18 @@ export default function AdminDashboard() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          {(["overview", "clients", "analyses"] as const).map((t) => (
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {(["overview", "clients", "analyses", "users", "settings", "usage"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
                 tab === t
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t === "overview" ? "Visão Geral" : t === "clients" ? "Clientes" : "Análises"}
+              {t === "overview" ? "Visão Geral" : t === "clients" ? "Clientes" : t === "analyses" ? "Análises" : t === "users" ? "Usuários" : t === "settings" ? "IA" : "Uso"}
             </button>
           ))}
         </div>
@@ -169,6 +171,24 @@ export default function AdminDashboard() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {tab === "users" && <AdminUserManagement />}
+
+        {tab === "settings" && <AdminAISettings />}
+
+        {tab === "usage" && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-6">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">Estatísticas de Uso</h3>
+            </div>
+            <div className="glass-card rounded-xl p-6 text-center">
+              <p className="text-muted-foreground mb-4">Estatísticas de uso serão exibidas aqui</p>
+              <p className="text-sm text-muted-foreground">Total de análises: {analyses.length}</p>
+              <p className="text-sm text-muted-foreground">Análises concluídas: {completedAnalyses}</p>
+            </div>
           </div>
         )}
       </main>
