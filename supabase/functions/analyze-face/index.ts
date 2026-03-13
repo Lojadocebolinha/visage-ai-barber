@@ -11,7 +11,12 @@ type AnalysisFields = {
   face_shape?: string;
   jaw_shape?: string;
   forehead?: string;
+  forehead_size?: string;
   proportion?: string;
+  hair_type?: string;
+  hair_texture?: string;
+  hair_volume?: string;
+  beard_presence?: string;
   current_style?: string;
   contrast_level?: string;
   recommended_style?: string;
@@ -125,6 +130,7 @@ async function callImageModel(
       },
     ],
     modalities: ["image", "text"],
+    responseModalities: ["TEXT", "IMAGE"],
   };
 
   console.log("Calling image model:", model);
@@ -154,6 +160,143 @@ async function callImageModel(
   return extractImageDataUrl(data);
 }
 
+function extractMessageText(content: unknown): string {
+  if (typeof content === "string") return content;
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part: any) => {
+        if (typeof part === "string") return part;
+        if (typeof part?.text === "string") return part.text;
+        return "";
+      })
+      .join("\n")
+      .trim();
+  }
+
+  return "";
+}
+
+function hashString(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function pickSeededOption(seed: string, options: string[]): string {
+  if (!options.length) return "Low Fade";
+  const idx = hashString(seed) % options.length;
+  return options[idx];
+}
+
+function buildPreferenceHints(answers: Record<string, unknown>): string[] {
+  const toLower = (value: unknown) => String(value || "").trim().toLowerCase();
+
+  const formal = toLower(answers.formal);
+  const style = toLower(answers.style);
+  const pomade = toLower(answers.pomade);
+  const hairloss = toLower(answers.hairloss);
+  const length = toLower(answers.length);
+  const beard = toLower(answers.beard);
+  const maintenance = toLower(answers.maintenance);
+  const change = toLower(answers.change);
+
+  return [
+    formal.includes("sim") ? "Work context: formal." : "Work context: not strictly formal.",
+    style.includes("moderno") ? "Preferred vibe: modern." : "Preferred vibe: discreet/classic.",
+    pomade.includes("pomada") ? "Styling product accepted." : "Natural finish preferred.",
+    hairloss.includes("sim") ? "Has hairline recession or thinning areas." : "No clear hairline recession preference.",
+    length.includes("sim") ? "Wants to keep some top length." : "Open to shorter top.",
+    beard.includes("sim") ? "Usually wears beard." : "Usually no beard.",
+    maintenance.includes("sim") ? "Wants low-maintenance haircut." : "Accepts medium/high maintenance.",
+    change.includes("sim") ? "Open to stronger visual change." : "Prefers conservative changes.",
+  ];
+}
+
+function fallbackCutFromAnswers(answers: Record<string, unknown>, seed: string): string {
+  const toLower = (value: unknown) => String(value || "").trim().toLowerCase();
+
+  const style = toLower(answers.style);
+  const maintenance = toLower(answers.maintenance);
+  const formal = toLower(answers.formal);
+  const change = toLower(answers.change);
+  const hairloss = toLower(answers.hairloss);
+
+  const modernCuts = [
+    "Mid Fade with Textured Top",
+    "High Fade Crop",
+    "Burst Fade with Curly Top",
+    "Taper Fade Quiff",
+    "Modern Crew Cut",
+  ];
+
+  const classicCuts = [
+    "Social Cut with Scissor Finish",
+    "Classic Taper",
+    "Layered Scissor Cut",
+    "Low Fade Classic",
+    "Crew Cut #3",
+  ];
+
+  if (maintenance.includes("sim") && hairloss.includes("sim")) {
+    return pickSeededOption(seed, ["Buzz Cut #2", "Crew Cut #2 with Low Taper", "Machine #3 Classic"]);
+  }
+
+  if (maintenance.includes("sim")) {
+    return pickSeededOption(seed, ["Crew Cut", "Low Fade #3", "Buzz Cut #3", "Taper Fade #4"]);
+  }
+
+  if (formal.includes("sim") && !change.includes("sim")) {
+    return pickSeededOption(seed, classicCuts);
+  }
+
+  if (style.includes("moderno") || change.includes("sim")) {
+    return pickSeededOption(seed, modernCuts);
+  }
+
+  return pickSeededOption(seed, [...classicCuts, ...modernCuts]);
+}
+
+function getBeardEditingRules(answers: Record<string, unknown>, parsed: AnalysisFields): string {
+  const beardAnswer = String(answers.beard || "").toLowerCase();
+  const beardPresence = String(parsed.beard_presence || "").toLowerCase();
+  const beardRecommendation = String(parsed.beard_recommendation || "").toLowerCase();
+
+  const noBeardContext =
+    beardAnswer.includes("não") ||
+    beardAnswer.includes("nao") ||
+    beardPresence.includes("none") ||
+    beardPresence.includes("sem") ||
+    beardPresence.includes("clean");
+
+  if (noBeardContext) {
+    return [
+      "- If the original photo has no beard, keep it clean-shaven.",
+      "- NEVER add beard.",
+      "- NEVER add mustache.",
+      "- Do not alter jawline structure.",
+    ].join("\n");
+  }
+
+  if (beardRecommendation.includes("clean shave") || beardRecommendation.includes("barba feita")) {
+    return [
+      "- Clean shave requested.",
+      "- Remove beard only if beard exists in original photo.",
+      "- NEVER add beard.",
+      "- NEVER add mustache.",
+    ].join("\n");
+  }
+
+  return [
+    "- If beard exists, keep it unless style requires subtle adjustment.",
+    "- If no beard, do not add beard.",
+    "- Only change beard if truly needed for harmony.",
+    "- NEVER change facial identity.",
+  ].join("\n");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -174,30 +317,45 @@ serve(async (req) => {
     const mimeType = photoResponse.headers.get("content-type") || "image/jpeg";
     const base64Photo = cleanBase64(arrayBufferToBase64(await photoResponse.arrayBuffer()));
 
-    const answersText = Object.entries(answers || {})
+    const normalizedAnswers = (answers || {}) as Record<string, unknown>;
+    const answersText = Object.entries(normalizedAnswers)
       .map(([q, a]) => `${q}: ${a}`)
       .join("\n");
 
-    const analysisPrompt = `You are a professional male visagism barber AI.
+    const preferenceHints = buildPreferenceHints(normalizedAnswers)
+      .map((hint) => `- ${hint}`)
+      .join("\n");
 
-When the user sends photo and questionnaire answers you must automatically:
-1 analyze the face
-2 detect face shape
-3 suggest best haircut
-4 suggest beard
+    const analysisPrompt = `You are a professional barber and visagist AI.
 
-Face analysis:
-detect face shape, jaw, forehead, proportion, hair type, beard, style.
+Analyze the uploaded photo and the questionnaire answers to select the best professional haircut for this exact person.
 
-Face shape must be one: oval, round, square, triangle, diamond, rectangular.
+MANDATORY PROFESSIONAL ANALYSIS:
+- face shape
+- hair type
+- hair texture
+- hair volume
+- forehead size
+- jaw shape
+- beard presence
+- user preferences from form
 
-Haircut suggestion must include: cut name, fade type, top size, beard style, style type.
+HAIRCUT SELECTION RULES:
+- Choose haircut professionally from facial/hair evidence + form preferences.
+- Do NOT always choose the same haircut.
+- Allowed styles include (not limited to): mid fade, low fade, high fade, taper fade, burst fade, social cut, scissor cut, layered cut, buzz cut, crew cut, mohawk, classic, modern, textured, machine 1-5.
+- Explain why the chosen style fits this person.
 
 Questionnaire answers:
 ${answersText}
 
+Derived preference hints:
+${preferenceHints}
+
 Return ONLY valid JSON with keys:
-face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips`;
+face_shape, jaw_shape, forehead, forehead_size, proportion, hair_type, hair_texture, hair_volume, beard_presence, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips
+
+For maintenance_tips, return an array of short strings.`;
 
     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -227,7 +385,8 @@ face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, reco
     }
 
     const analysisData = await analysisResponse.json();
-    const rawText = analysisData.choices?.[0]?.message?.content || "";
+    const rawContent = analysisData?.choices?.[0]?.message?.content;
+    const rawText = extractMessageText(rawContent);
 
     let parsed: AnalysisFields = {};
     try {
@@ -246,10 +405,11 @@ face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, reco
 
     parsed.face_shape = normalizeFaceShape(parsed.face_shape);
 
-    const recommendedCut = parsed.suggested_cut || "Low Fade";
-    const beardStyle = parsed.beard_recommendation || "Clean shave";
-    const fadeStyle = parsed.fade_type || "Low fade";
-    const topStyle = parsed.top_style || "Textured top";
+    const recommendedCut = parsed.suggested_cut || fallbackCutFromAnswers(normalizedAnswers, analysisId);
+    const beardStyle = parsed.beard_recommendation || "Keep existing beard naturally";
+    const fadeStyle = parsed.fade_type || "Adapt fade to face shape";
+    const topStyle = parsed.top_style || "Maintain natural texture";
+    const beardRules = getBeardEditingRules(normalizedAnswers, parsed);
 
     const imagePrompt = `Professional barber visagism image editing.
 
@@ -266,18 +426,24 @@ MANDATORY RULES:
 - Keep the exact same person.
 
 FACIAL HAIR RULES:
-- Clean shave requested.
-- Remove beard only if beard exists.
-- NEVER add beard.
-- NEVER add mustache.
-- NEVER change facial hair unless requested.
+${beardRules}
 
 IMAGE RULES:
 - Same angle as original photo.
 - Same lighting.
 - Same background.
 - Same person.
-- Front portrait.`;
+- Front portrait.
+
+BARBER EXECUTION RULES:
+- Change only hair unless beard adjustment is explicitly needed.
+- Keep natural hair texture and natural hair color unless needed for realism.
+- Keep realistic professional barbershop result.
+- Respect user questionnaire preferences.
+- Analysis context: face shape (${parsed.face_shape || "unknown"}), hair type (${parsed.hair_type || "unknown"}), hair texture (${parsed.hair_texture || "unknown"}), hair volume (${parsed.hair_volume || "unknown"}), forehead (${parsed.forehead_size || parsed.forehead || "unknown"}), jaw (${parsed.jaw_shape || "unknown"}), beard (${parsed.beard_presence || "unknown"}).
+- Preferred fade: ${fadeStyle}.
+- Preferred top style: ${topStyle}.
+- Beard recommendation context: ${beardStyle}.`;
 
     let generatedDataUrl: string | null = await callImageModel(
       LOVABLE_API_KEY,
