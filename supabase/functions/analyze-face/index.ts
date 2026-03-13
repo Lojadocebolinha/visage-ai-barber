@@ -317,30 +317,45 @@ serve(async (req) => {
     const mimeType = photoResponse.headers.get("content-type") || "image/jpeg";
     const base64Photo = cleanBase64(arrayBufferToBase64(await photoResponse.arrayBuffer()));
 
-    const answersText = Object.entries(answers || {})
+    const normalizedAnswers = (answers || {}) as Record<string, unknown>;
+    const answersText = Object.entries(normalizedAnswers)
       .map(([q, a]) => `${q}: ${a}`)
       .join("\n");
 
-    const analysisPrompt = `You are a professional male visagism barber AI.
+    const preferenceHints = buildPreferenceHints(normalizedAnswers)
+      .map((hint) => `- ${hint}`)
+      .join("\n");
 
-When the user sends photo and questionnaire answers you must automatically:
-1 analyze the face
-2 detect face shape
-3 suggest best haircut
-4 suggest beard
+    const analysisPrompt = `You are a professional barber and visagist AI.
 
-Face analysis:
-detect face shape, jaw, forehead, proportion, hair type, beard, style.
+Analyze the uploaded photo and the questionnaire answers to select the best professional haircut for this exact person.
 
-Face shape must be one: oval, round, square, triangle, diamond, rectangular.
+MANDATORY PROFESSIONAL ANALYSIS:
+- face shape
+- hair type
+- hair texture
+- hair volume
+- forehead size
+- jaw shape
+- beard presence
+- user preferences from form
 
-Haircut suggestion must include: cut name, fade type, top size, beard style, style type.
+HAIRCUT SELECTION RULES:
+- Choose haircut professionally from facial/hair evidence + form preferences.
+- Do NOT always choose the same haircut.
+- Allowed styles include (not limited to): mid fade, low fade, high fade, taper fade, burst fade, social cut, scissor cut, layered cut, buzz cut, crew cut, mohawk, classic, modern, textured, machine 1-5.
+- Explain why the chosen style fits this person.
 
 Questionnaire answers:
 ${answersText}
 
+Derived preference hints:
+${preferenceHints}
+
 Return ONLY valid JSON with keys:
-face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips`;
+face_shape, jaw_shape, forehead, forehead_size, proportion, hair_type, hair_texture, hair_volume, beard_presence, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips
+
+For maintenance_tips, return an array of short strings.`;
 
     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
