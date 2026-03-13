@@ -160,6 +160,143 @@ async function callImageModel(
   return extractImageDataUrl(data);
 }
 
+function extractMessageText(content: unknown): string {
+  if (typeof content === "string") return content;
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part: any) => {
+        if (typeof part === "string") return part;
+        if (typeof part?.text === "string") return part.text;
+        return "";
+      })
+      .join("\n")
+      .trim();
+  }
+
+  return "";
+}
+
+function hashString(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function pickSeededOption(seed: string, options: string[]): string {
+  if (!options.length) return "Low Fade";
+  const idx = hashString(seed) % options.length;
+  return options[idx];
+}
+
+function buildPreferenceHints(answers: Record<string, unknown>): string[] {
+  const toLower = (value: unknown) => String(value || "").trim().toLowerCase();
+
+  const formal = toLower(answers.formal);
+  const style = toLower(answers.style);
+  const pomade = toLower(answers.pomade);
+  const hairloss = toLower(answers.hairloss);
+  const length = toLower(answers.length);
+  const beard = toLower(answers.beard);
+  const maintenance = toLower(answers.maintenance);
+  const change = toLower(answers.change);
+
+  return [
+    formal.includes("sim") ? "Work context: formal." : "Work context: not strictly formal.",
+    style.includes("moderno") ? "Preferred vibe: modern." : "Preferred vibe: discreet/classic.",
+    pomade.includes("pomada") ? "Styling product accepted." : "Natural finish preferred.",
+    hairloss.includes("sim") ? "Has hairline recession or thinning areas." : "No clear hairline recession preference.",
+    length.includes("sim") ? "Wants to keep some top length." : "Open to shorter top.",
+    beard.includes("sim") ? "Usually wears beard." : "Usually no beard.",
+    maintenance.includes("sim") ? "Wants low-maintenance haircut." : "Accepts medium/high maintenance.",
+    change.includes("sim") ? "Open to stronger visual change." : "Prefers conservative changes.",
+  ];
+}
+
+function fallbackCutFromAnswers(answers: Record<string, unknown>, seed: string): string {
+  const toLower = (value: unknown) => String(value || "").trim().toLowerCase();
+
+  const style = toLower(answers.style);
+  const maintenance = toLower(answers.maintenance);
+  const formal = toLower(answers.formal);
+  const change = toLower(answers.change);
+  const hairloss = toLower(answers.hairloss);
+
+  const modernCuts = [
+    "Mid Fade with Textured Top",
+    "High Fade Crop",
+    "Burst Fade with Curly Top",
+    "Taper Fade Quiff",
+    "Modern Crew Cut",
+  ];
+
+  const classicCuts = [
+    "Social Cut with Scissor Finish",
+    "Classic Taper",
+    "Layered Scissor Cut",
+    "Low Fade Classic",
+    "Crew Cut #3",
+  ];
+
+  if (maintenance.includes("sim") && hairloss.includes("sim")) {
+    return pickSeededOption(seed, ["Buzz Cut #2", "Crew Cut #2 with Low Taper", "Machine #3 Classic"]);
+  }
+
+  if (maintenance.includes("sim")) {
+    return pickSeededOption(seed, ["Crew Cut", "Low Fade #3", "Buzz Cut #3", "Taper Fade #4"]);
+  }
+
+  if (formal.includes("sim") && !change.includes("sim")) {
+    return pickSeededOption(seed, classicCuts);
+  }
+
+  if (style.includes("moderno") || change.includes("sim")) {
+    return pickSeededOption(seed, modernCuts);
+  }
+
+  return pickSeededOption(seed, [...classicCuts, ...modernCuts]);
+}
+
+function getBeardEditingRules(answers: Record<string, unknown>, parsed: AnalysisFields): string {
+  const beardAnswer = String(answers.beard || "").toLowerCase();
+  const beardPresence = String(parsed.beard_presence || "").toLowerCase();
+  const beardRecommendation = String(parsed.beard_recommendation || "").toLowerCase();
+
+  const noBeardContext =
+    beardAnswer.includes("não") ||
+    beardAnswer.includes("nao") ||
+    beardPresence.includes("none") ||
+    beardPresence.includes("sem") ||
+    beardPresence.includes("clean");
+
+  if (noBeardContext) {
+    return [
+      "- If the original photo has no beard, keep it clean-shaven.",
+      "- NEVER add beard.",
+      "- NEVER add mustache.",
+      "- Do not alter jawline structure.",
+    ].join("\n");
+  }
+
+  if (beardRecommendation.includes("clean shave") || beardRecommendation.includes("barba feita")) {
+    return [
+      "- Clean shave requested.",
+      "- Remove beard only if beard exists in original photo.",
+      "- NEVER add beard.",
+      "- NEVER add mustache.",
+    ].join("\n");
+  }
+
+  return [
+    "- If beard exists, keep it unless style requires subtle adjustment.",
+    "- If no beard, do not add beard.",
+    "- Only change beard if truly needed for harmony.",
+    "- NEVER change facial identity.",
+  ].join("\n");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
