@@ -273,32 +273,44 @@ face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, reco
 
     parsed.face_shape = normalizeFaceShape(parsed.face_shape);
 
-    const imagePrompt = `You are a professional barber visagism AI.
+    const recommendedCut = parsed.suggested_cut || "Low Fade";
+    const beardStyle = parsed.beard_recommendation || "Clean shave";
+    const fadeStyle = parsed.fade_type || "Low fade";
+    const topStyle = parsed.top_style || "Textured top";
 
-Analyze the face and generate a new realistic image of the same person.
+    const imagePrompt = `Professional barber visagism image editing.
 
-Keep same face.
-Keep same identity.
-Only change hair and beard.
+TARGET STYLE: ${recommendedCut}, ${fadeStyle}, ${topStyle}
 
-Apply best haircut: ${parsed.suggested_cut || "Low Fade"}.
-Apply beard style: ${parsed.beard_recommendation || "Short beard"}.
-Apply fade: ${parsed.fade_type || "Low fade"}.
-Apply top style: ${parsed.top_style || "Textured top"}.
+MANDATORY RULES:
+- Use the uploaded image as the only reference.
+- This is image-to-image editing.
+- Do NOT generate a new person.
+- Do NOT change identity.
+- Do NOT replace the face.
+- Keep 100% of original facial structure.
+- Keep same eyes, nose, mouth, skin color, age and gender.
+- Keep the exact same person.
 
-Realistic photo.
-Barbershop.
-Studio lighting.
-4k.
-50mm lens.
-Natural skin.
-High quality.
+HAIR EDIT:
+- Apply haircut: ${recommendedCut}
+- Apply fade: ${fadeStyle}
+- Apply top style: ${topStyle}
 
-No cartoon.
-No anime.
-No drawing.
-No different face.
-No different person.`;
+FACIAL HAIR RULES:
+- Beard style: ${beardStyle}
+- If clean shave requested, remove beard only if beard exists.
+- NEVER add beard unless explicitly requested.
+- NEVER add mustache unless explicitly requested.
+- NEVER change facial hair unless requested.
+
+IMAGE RULES:
+- Same angle as original photo.
+- Same lighting.
+- Same background.
+- Same person.
+- Front portrait.
+- Realistic photo quality.`;
 
     let generatedDataUrl: string | null = await callImageModel(
       LOVABLE_API_KEY,
@@ -311,7 +323,7 @@ No different person.`;
     if (!generatedDataUrl) {
       generatedDataUrl = await callImageModel(
         LOVABLE_API_KEY,
-        "google/gemini-1.5-flash-image-preview",
+        "google/gemini-2.5-flash-image",
         imagePrompt,
         mimeType,
         base64Photo
