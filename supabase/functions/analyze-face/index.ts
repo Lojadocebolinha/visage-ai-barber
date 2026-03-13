@@ -385,7 +385,8 @@ For maintenance_tips, return an array of short strings.`;
     }
 
     const analysisData = await analysisResponse.json();
-    const rawText = analysisData.choices?.[0]?.message?.content || "";
+    const rawContent = analysisData?.choices?.[0]?.message?.content;
+    const rawText = extractMessageText(rawContent);
 
     let parsed: AnalysisFields = {};
     try {
