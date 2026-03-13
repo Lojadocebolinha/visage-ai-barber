@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Scissors, Home, BarChart3, LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { translations } from "@/lib/translations";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -46,28 +47,26 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-2">
           {user && (
             <>
-              {isAdmin ? (
-                <>
-                  <Button
-                    variant={location.pathname === "/admin" ? "default" : "ghost"}
-                    onClick={() => navigate("/admin")}
-                    className="gap-2"
-                  >
-                    <BarChart3 className="w-4 h-4" />
-                    Painel Admin
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant={location.pathname === "/dashboard" ? "default" : "ghost"}
-                    onClick={() => navigate("/dashboard")}
-                    className="gap-2"
-                  >
-                    <Home className="w-4 h-4" />
-                    Início
-                  </Button>
-                </>
+              {isAdmin && (
+                <Button
+                  variant={location.pathname === "/admin" ? "default" : "ghost"}
+                  onClick={() => navigate("/admin")}
+                  className="gap-2"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  {translations.navbar.painel_admin}
+                </Button>
+              )}
+
+              {!isAdmin && (
+                <Button
+                  variant={location.pathname === "/dashboard" ? "default" : "ghost"}
+                  onClick={() => navigate("/dashboard")}
+                  className="gap-2"
+                >
+                  <Home className="w-4 h-4" />
+                  {translations.navbar.inicio}
+                </Button>
               )}
 
               <Button
@@ -76,13 +75,13 @@ export default function Navbar() {
                 className="gap-2 text-muted-foreground hover:text-foreground"
               >
                 <LogOut className="w-4 h-4" />
-                Sair
+                {translations.navbar.sair}
               </Button>
             </>
           )}
 
           {!user && (
-            <Button onClick={() => navigate("/auth")}>Entrar</Button>
+            <Button onClick={() => navigate("/auth")}>{translations.navbar.entrar}</Button>
           )}
         </div>
 
@@ -108,7 +107,7 @@ export default function Navbar() {
           <div className="px-4 py-3 space-y-2">
             {user && (
               <>
-                {isAdmin ? (
+                {isAdmin && (
                   <Button
                     variant={location.pathname === "/admin" ? "default" : "outline"}
                     onClick={() => {
@@ -118,9 +117,11 @@ export default function Navbar() {
                     className="w-full justify-start gap-2"
                   >
                     <BarChart3 className="w-4 h-4" />
-                    Painel Admin
+                    {translations.navbar.painel_admin}
                   </Button>
-                ) : (
+                )}
+
+                {!isAdmin && (
                   <Button
                     variant={location.pathname === "/dashboard" ? "default" : "outline"}
                     onClick={() => {
@@ -130,7 +131,7 @@ export default function Navbar() {
                     className="w-full justify-start gap-2"
                   >
                     <Home className="w-4 h-4" />
-                    Início
+                    {translations.navbar.inicio}
                   </Button>
                 )}
 
@@ -140,7 +141,7 @@ export default function Navbar() {
                   className="w-full justify-start gap-2 text-muted-foreground"
                 >
                   <LogOut className="w-4 h-4" />
-                  Sair
+                  {translations.navbar.sair}
                 </Button>
               </>
             )}
@@ -153,7 +154,7 @@ export default function Navbar() {
                 }}
                 className="w-full"
               >
-                Entrar
+                {translations.navbar.entrar}
               </Button>
             )}
           </div>

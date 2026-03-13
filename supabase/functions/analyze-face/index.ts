@@ -431,6 +431,10 @@ MANDATORY IMAGE EDITING RULES:
   - Retaining the original age and gender of the person.
 - The output image MUST be a realistic photo, not an artistic rendering or cartoon.
 - Maintain the same angle, lighting conditions, and background as the original photo.
+- CRITICAL: Do NOT rotate the image. Keep the exact same orientation as the original photo.
+- CRITICAL: Do NOT distort or stretch the face. Maintain aspect ratio and facial proportions.
+- CRITICAL: Do NOT flip or mirror the image horizontally or vertically.
+- Ensure the face maintains its natural proportions without any stretching or compression.
 
 HAIR EDITING RULES:
 - Change ONLY the hair. Focus on applying the TARGET HAIRCUT STYLE.
@@ -458,6 +462,13 @@ ANALYSIS CONTEXT FOR HAIRCUT SELECTION:
 Respect all user questionnaire preferences provided in the analysis phase.
 
 Produce a high-quality, realistic image reflecting the new haircut.
+
+IMPORTANT: Ensure the final image has:
+- Correct orientation (no rotation)
+- No facial distortion or stretching
+- Same aspect ratio as the original
+- Natural facial proportions preserved
+- Professional barber haircut quality
 
     let generatedDataUrl: string | null = await callImageModel(
       LOVABLE_API_KEY,

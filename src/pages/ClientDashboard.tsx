@@ -3,13 +3,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import PreAnalysisForm from "@/components/PreAnalysisForm";
 import PhotoUpload from "@/components/PhotoUpload";
-import AnalysisResult from "@/components/AnalysisResult";
+import ProfessionalAnalysisResult from "@/components/ProfessionalAnalysisResult";
 import CreditsDisplay from "@/components/CreditsDisplay";
+import LoadingAnimation from "@/components/LoadingAnimation";
 import { Tables } from "@/integrations/supabase/types";
 import { Scissors, History, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import ClientHistory from "@/components/ClientHistory";
+import { translations } from "@/lib/translations";
 
 type Step = "questionnaire" | "photo" | "analyzing" | "result" | "history";
 
@@ -38,7 +40,7 @@ export default function ClientDashboard() {
 
     if (aiError) {
       console.error("AI analysis error:", aiError);
-      toast.error("Erro na análise IA. Tente novamente.");
+      toast.error(translations.dashboard.erro_analise);
       setStep("photo");
       return;
     }
@@ -47,7 +49,7 @@ export default function ClientDashboard() {
       if (aiResult.error === "RATE_LIMITED") {
         toast.error("Muitas requisições. Aguarde um momento e tente novamente.");
       } else if (aiResult.error === "PAYMENT_REQUIRED") {
-        toast.error("Créditos insuficientes para análise IA.");
+        toast.error(translations.dashboard.sem_creditos);
       } else if (aiResult.error === "IMAGE_GENERATION_FAILED") {
         toast.error("Não foi possível gerar a imagem do corte. Tente novamente.");
       } else {
@@ -179,9 +181,9 @@ export default function ClientDashboard() {
 
         {step === "questionnaire" && (
           <div>
-            <h2 className="text-2xl font-display font-bold text-foreground mb-2">Pré-Análise</h2>
+            <h2 className="text-2xl font-display font-bold text-foreground mb-2">{translations.dashboard.pre_analise}</h2>
             <p className="text-muted-foreground text-sm mb-6">
-              Responda algumas perguntas para personalizarmos sua sugestão.
+              {translations.dashboard.responda_perguntas}
             </p>
             <PreAnalysisForm onComplete={handlePreAnalysisComplete} />
           </div>
@@ -189,21 +191,11 @@ export default function ClientDashboard() {
 
         {step === "photo" && <PhotoUpload onUpload={handlePhotoUpload} uploading={uploading} />}
 
-        {step === "analyzing" && (
-          <div className="text-center py-16 animate-fade-in">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-gradient-gold flex items-center justify-center animate-pulse">
-              <Scissors className="w-8 h-8 text-primary-foreground" />
-            </div>
-            <h3 className="text-xl font-display font-semibold text-foreground mb-2">Analisando...</h3>
-            <p className="text-muted-foreground text-sm">
-              Nosso visagista IA está avaliando seu rosto e gerando a simulação do corte.
-            </p>
-          </div>
-        )}
+        {step === "analyzing" && <LoadingAnimation step="analyzing" />}
 
         {step === "result" && analysis && (
           <div>
-            <AnalysisResult
+            <ProfessionalAnalysisResult
               analysis={analysis}
               onSave={handleSave}
               onRegenerate={handleRegenerate}
@@ -213,7 +205,7 @@ export default function ClientDashboard() {
               onClick={startNew}
               className="w-full mt-4 border-border text-foreground"
             >
-              Nova Análise
+              {translations.dashboard.resultado}
             </Button>
           </div>
         )}
