@@ -75,36 +75,53 @@ export default function ProfessionalAnalysisResult({
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Generated Image */}
+      {/* Generated Image - Portrait Orientation */}
       {analysis.generated_image_url && (
-        <div className="relative rounded-xl overflow-hidden shadow-lg group">
-          <img
-            src={analysis.generated_image_url}
-            alt="Resultado da análise"
-            className="w-full h-auto object-contain bg-secondary"
+        <div className="flex justify-center">
+          <div
+            className="relative rounded-xl overflow-hidden shadow-lg group mx-auto"
             style={{
-              maxHeight: "500px",
-              objectFit: "contain",
+              maxWidth: "400px",
+              aspectRatio: "3/4",
+              backgroundColor: "var(--secondary)",
             }}
-          />
-          <div className="absolute top-3 right-3 flex gap-2">
-            <Button
-              size="icon"
-              variant="secondary"
+          >
+            <img
+              src={analysis.generated_image_url}
+              alt="Resultado da análise"
+              className="w-full h-full object-cover bg-secondary cursor-pointer hover:opacity-90 transition-opacity"
+              style={{
+                objectFit: "cover",
+                objectPosition: "center",
+                imageOrientation: "from-image",
+              }}
               onClick={() => setShowImageViewer(true)}
-              className="rounded-full"
               title={translations.resultado.expandir}
-            >
-              <Maximize2 className="w-4 h-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="secondary"
-              onClick={() => setIsFavorited(!isFavorited)}
-              className="rounded-full"
-            >
-              <Heart className={`w-4 h-4 ${isFavorited ? "fill-current text-red-500" : ""}`} />
-            </Button>
+            />
+            <div className="absolute top-3 right-3 flex gap-2">
+              <Button
+                size="icon"
+                variant="secondary"
+                onClick={() => setShowImageViewer(true)}
+                className="rounded-full shadow-md hover:shadow-lg"
+                title={translations.resultado.expandir}
+              >
+                <Maximize2 className="w-4 h-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="secondary"
+                onClick={() => setIsFavorited(!isFavorited)}
+                className="rounded-full shadow-md hover:shadow-lg"
+                title={isFavorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+              >
+                <Heart
+                  className={`w-4 h-4 ${
+                    isFavorited ? "fill-current text-red-500" : ""
+                  }`}
+                />
+              </Button>
+            </div>
           </div>
         </div>
       )}

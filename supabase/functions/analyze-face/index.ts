@@ -332,36 +332,36 @@ serve(async (req) => {
 
     const mimeType = photoResponse.headers.get("content-type") || "image/jpeg";
     const base64Photo = cleanBase64(arrayBufferToBase64(await photoResponse.arrayBuffer()));
-    const analysisPrompt = `You are a professional barber and visagist AI.
+    const analysisPrompt = `Você é uma IA profissional de barbeiro e visagista.
 
-Analyze the uploaded photo and the questionnaire answers to select the best professional haircut for this exact person.
+Analise a foto enviada e as respostas do questionário para selecionar o melhor corte de cabelo profissional para esta pessoa exata.
 
-MANDATORY PROFESSIONAL ANALYSIS:
-- face shape
-- hair type
-- hair texture
-- hair volume
-- forehead size
-- jaw shape
-- beard presence
-- user preferences from form
+ANÁLISE PROFISSIONAL OBRIGATÓRIA:
+- forma do rosto
+- tipo de cabelo
+- textura do cabelo
+- volume do cabelo
+- tamanho da testa
+- forma da mandíbula
+- presença de barba
+- preferências do usuário do formulário
 
-HAIRCUT SELECTION RULES:
-- Choose haircut professionally from facial/hair evidence + form preferences.
-- Do NOT always choose the same haircut.
-- Allowed styles include (not limited to): mid fade, low fade, high fade, taper, burst fade, social, scissor cut, buzz cut, crew cut, mohawk, classic, modern, machine 1 2 3 4 5.
-- Explain why the chosen style fits this person.
+REGRAS DE SELEÇÃO DE CORTE:
+- Escolha o corte de forma profissional com base em evidências faciais/capilares + preferências do formulário.
+- NÃO escolha sempre o mesmo corte.
+- Estilos permitidos incluem (não limitado a): fade médio, fade baixo, fade alto, degradê, burst fade, social, corte tesoura, buzz cut, crew cut, mohawk, clássico, moderno, máquina 1 2 3 4 5.
+- Explique por que o estilo escolhido se adequa a esta pessoa.
 
-Questionnaire answers:
+Respostas do questionário:
 ${answersText}
 
-Derived preference hints:
+Dicas de preferência derivadas:
 ${preferenceHints}
 
-Return ONLY valid JSON with keys:
+Retorne APENAS JSON válido com as chaves:
 face_shape, jaw_shape, forehead, forehead_size, proportion, hair_type, hair_texture, hair_volume, beard_presence, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips
 
-For maintenance_tips, return an array of short strings.`;
+Para maintenance_tips, retorne um array de strings curtas em Português (Brasil).`;
 
     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -417,58 +417,58 @@ For maintenance_tips, return an array of short strings.`;
     const topStyle = parsed.top_style || "Maintain natural texture";
     const beardRules = getBeardEditingRules(normalizedAnswers, parsed);
 
-    const imagePrompt = `You are a professional barber visagist AI. Your task is to perform image-to-image editing to apply a new haircut to the person in the uploaded photo, strictly following the rules below.
+    const imagePrompt = `Você é uma IA profissional de barbeiro visagista. Sua tarefa é realizar edição de imagem-para-imagem para aplicar um novo corte de cabelo à pessoa na foto enviada, seguindo rigorosamente as regras abaixo.
 
-TARGET HAIRCUT STYLE: ${recommendedCut}
+ESTILO DE CORTE ALVO: ${recommendedCut}
 
-MANDATORY IMAGE EDITING RULES:
-- Use the uploaded photo as the base for all edits.
-- This is image-to-image editing; DO NOT generate a new image from scratch.
-- Preserve the original person's identity 100%. This includes:
-  - NOT generating a new face.
-  - Keeping the exact same eyes, nose, mouth, and overall facial structure.
-  - Maintaining the original skin color and tone.
-  - Retaining the original age and gender of the person.
-- The output image MUST be a realistic photo, not an artistic rendering or cartoon.
-- Maintain the same angle, lighting conditions, and background as the original photo.
-- CRITICAL: Do NOT rotate the image. Keep the exact same orientation as the original photo.
-- CRITICAL: Do NOT distort or stretch the face. Maintain aspect ratio and facial proportions.
-- CRITICAL: Do NOT flip or mirror the image horizontally or vertically.
-- Ensure the face maintains its natural proportions without any stretching or compression.
+REGRAS OBRIGATÓRIAS DE EDIÇÃO DE IMAGEM:
+- Use a foto enviada como base para todas as edições.
+- Esta é edição imagem-para-imagem; NÃO gere uma nova imagem do zero.
+- Preserve a identidade da pessoa original 100%. Isto inclui:
+  - NÃO gerar um novo rosto.
+  - Manter exatamente os mesmos olhos, nariz, boca e estrutura facial geral.
+  - Manter a cor e tom de pele original.
+  - Manter a idade e gênero original da pessoa.
+- A imagem de saída DEVE ser uma foto realista, não uma renderização artística ou desenho.
+- Mantenha o mesmo ângulo, condições de iluminação e fundo da foto original.
+- CRÍTICO: NÃO rode a imagem. Mantenha exatamente a mesma orientação da foto original.
+- CRÍTICO: NÃO distora ou estique o rosto. Mantenha a proporção de aspecto e proporções faciais.
+- CRÍTICO: NÃO inverta ou espelhe a imagem horizontalmente ou verticalmente.
+- Garanta que o rosto mantenha suas proporções naturais sem nenhum esticamento ou compressão.
 
-HAIR EDITING RULES:
-- Change ONLY the hair. Focus on applying the TARGET HAIRCUT STYLE.
-- Keep the natural hair texture and natural hair color of the person, unless the chosen style explicitly requires a subtle, realistic adjustment (e.g., a slight tone enhancement for realism).
-- The haircut must be a realistic barber haircut, as if performed by a professional.
-- The haircut selection is based on the analysis context (face shape, hair type, form answers, style preference).
-- Ensure the chosen style is dynamically applied, avoiding repetitive results.
-- Allowed styles include: mid fade, low fade, high fade, taper, burst fade, social, scissor cut, buzz cut, crew cut, mohawk, classic, modern, machine 1 2 3 4 5.
+REGRAS DE EDIÇÃO DE CABELO:
+- Altere APENAS o cabelo. Concentre-se em aplicar o ESTILO DE CORTE ALVO.
+- Mantenha a textura natural e cor natural do cabelo da pessoa, a menos que o estilo escolhido exija explicitamente um ajuste sutil e realista (por exemplo, um leve aprimoramento de tom para realismo).
+- O corte deve ser um corte de barbeiro realista, como se realizado por um profissional.
+- A seleção do corte é baseada no contexto de análise (forma do rosto, tipo de cabelo, respostas do formulário, preferência de estilo).
+- Garanta que o estilo escolhido seja aplicado dinamicamente, evitando resultados repetitivos.
+- Estilos permitidos incluem: fade médio, fade baixo, fade alto, degradê, burst fade, social, corte tesoura, buzz cut, crew cut, mohawk, clássico, moderno, máquina 1 2 3 4 5.
 
-BEARD EDITING RULES:
+REGRAS DE EDIÇÃO DE BARBA:
 ${beardRules}
 
-ANALYSIS CONTEXT FOR HAIRCUT SELECTION:
-- Face Shape: ${parsed.face_shape || "unknown"}
-- Hair Type: ${parsed.hair_type || "unknown"}
-- Hair Texture: ${parsed.hair_texture || "unknown"}
-- Hair Volume: ${parsed.hair_volume || "unknown"}
-- Forehead: ${parsed.forehead_size || parsed.forehead || "unknown"}
-- Jaw: ${parsed.jaw_shape || "unknown"}
-- Beard Presence: ${parsed.beard_presence || "unknown"}
-- Preferred Fade: ${fadeStyle}
-- Preferred Top Style: ${topStyle}
-- Beard Recommendation Context: ${beardStyle}
+CONTEXTO DE ANÁLISE PARA SELEÇÃO DE CORTE:
+- Forma do Rosto: ${parsed.face_shape || "desconhecida"}
+- Tipo de Cabelo: ${parsed.hair_type || "desconhecido"}
+- Textura do Cabelo: ${parsed.hair_texture || "desconhecida"}
+- Volume do Cabelo: ${parsed.hair_volume || "desconhecido"}
+- Testa: ${parsed.forehead_size || parsed.forehead || "desconhecida"}
+- Mandíbula: ${parsed.jaw_shape || "desconhecida"}
+- Presença de Barba: ${parsed.beard_presence || "desconhecida"}
+- Fade Preferido: ${fadeStyle}
+- Estilo de Topo Preferido: ${topStyle}
+- Contexto de Recomendação de Barba: ${beardStyle}
 
-Respect all user questionnaire preferences provided in the analysis phase.
+Respeite todas as preferências do questionário do usuário fornecidas na fase de análise.
 
-Produce a high-quality, realistic image reflecting the new haircut.
+Produz uma imagem de alta qualidade e realista refletindo o novo corte de cabelo.
 
-IMPORTANT: Ensure the final image has:
-- Correct orientation (no rotation)
-- No facial distortion or stretching
-- Same aspect ratio as the original
-- Natural facial proportions preserved
-- Professional barber haircut quality
+IMPORTANTE: Garanta que a imagem final tenha:
+- Orientação correta (sem rotação)
+- Sem distorção ou esticamento facial
+- Mesma proporção de aspecto que o original
+- Proporções faciais naturais preservadas
+- Qualidade profissional de corte de barbeiro
 
     let generatedDataUrl: string | null = await callImageModel(
       LOVABLE_API_KEY,

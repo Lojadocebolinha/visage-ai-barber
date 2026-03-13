@@ -23,13 +23,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchRole = async (userId: string) => {
+  const fetchRole = async (userId: string, userEmail?: string) => {
+    // Define admin automaticamente para o e-mail do dono
+    const ADMIN_EMAIL = "at7477829@gmail.com";
+    const isAdmin = userEmail === ADMIN_EMAIL;
+
     const { data } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", userId)
       .single();
-    setRole(data?.role ?? "cliente");
+
+    let userRole = data?.role ?? "cliente";
+
+    // Se for o admin e não estiver marcado no banco, atualizar
+    if (isAdmin && userRole !== "admin") {
+      await supabase
+        .from("user_roles")
+        .upsert({ user_id: userId, role: "admin" }, { onConflict: "user_id" });
+      userRole = "admin";
+    }
+
+    setRole(userRole);
   };
 
   useEffect(() => {
@@ -38,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          setTimeout(() => fetchRole(session.user.id), 0);
+          setTimeout(() => fetchRole(session.user.id, session.user.email), 0);
         } else {
           setRole(null);
         }
@@ -50,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchRole(session.user.id);
+        fetchRole(session.user.id, session.user.email);
       }
       setLoading(false);
     });
