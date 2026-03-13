@@ -113,7 +113,7 @@ async function callImageModel(
   mimeType: string,
   base64Image: string
 ): Promise<string | null> {
-  const multimodalPayload = {
+  const payload = {
     model,
     messages: [
       {
@@ -125,8 +125,9 @@ async function callImageModel(
       },
     ],
     modalities: ["image", "text"],
-    responseModalities: ["TEXT", "IMAGE"],
   };
+
+  console.log("Calling image model:", model);
 
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -134,51 +135,23 @@ async function callImageModel(
       Authorization: `Bearer ${LOVABLE_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(multimodalPayload),
+    body: JSON.stringify(payload),
   });
 
-  if (response.ok) {
-    const data = await response.json();
-    return extractImageDataUrl(data);
-  }
-
-  // Fallback: Gemini-native shape via AI Gateway generateContent
-  const fallbackResponse = await fetch(
-    `https://ai.gateway.lovable.dev/v1/models/${model}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType,
-                  data: base64Image,
-                },
-              },
-            ],
-          },
-        ],
-        responseModalities: ["TEXT", "IMAGE"],
-      }),
-    }
-  );
-
-  if (!fallbackResponse.ok) {
-    const body = await fallbackResponse.text();
-    console.error("Image model failed:", fallbackResponse.status, body);
+  if (!response.ok) {
+    const body = await response.text();
+    console.error("Image model failed:", model, response.status, body);
     return null;
   }
 
-  const fallbackData = await fallbackResponse.json();
-  return extractImageDataUrl(fallbackData);
+  const data = await response.json();
+  const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+  if (typeof imageUrl === "string" && imageUrl.startsWith("data:image/")) {
+    return imageUrl;
+  }
+
+  // Fallback extraction
+  return extractImageDataUrl(data);
 }
 
 serve(async (req) => {
