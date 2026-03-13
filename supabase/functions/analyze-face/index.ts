@@ -253,7 +253,7 @@ face_shape, jaw_shape, forehead, proportion, current_style, contrast_level, reco
 
     const imagePrompt = `Professional barber visagism image editing.
 
-TARGET STYLE: ${recommendedCut}, ${fadeStyle}, ${topStyle}
+TARGET STYLE: ${recommendedCut}
 
 MANDATORY RULES:
 - Use the uploaded image as the only reference.
@@ -265,16 +265,11 @@ MANDATORY RULES:
 - Keep same eyes, nose, mouth, skin color, age and gender.
 - Keep the exact same person.
 
-HAIR EDIT:
-- Apply haircut: ${recommendedCut}
-- Apply fade: ${fadeStyle}
-- Apply top style: ${topStyle}
-
 FACIAL HAIR RULES:
-- Beard style: ${beardStyle}
-- If clean shave requested, remove beard only if beard exists.
-- NEVER add beard unless explicitly requested.
-- NEVER add mustache unless explicitly requested.
+- Clean shave requested.
+- Remove beard only if beard exists.
+- NEVER add beard.
+- NEVER add mustache.
 - NEVER change facial hair unless requested.
 
 IMAGE RULES:
@@ -282,8 +277,7 @@ IMAGE RULES:
 - Same lighting.
 - Same background.
 - Same person.
-- Front portrait.
-- Realistic photo quality.`;
+- Front portrait.`;
 
     let generatedDataUrl: string | null = await callImageModel(
       LOVABLE_API_KEY,
