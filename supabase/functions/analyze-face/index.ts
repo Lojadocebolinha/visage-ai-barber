@@ -405,10 +405,11 @@ For maintenance_tips, return an array of short strings.`;
 
     parsed.face_shape = normalizeFaceShape(parsed.face_shape);
 
-    const recommendedCut = parsed.suggested_cut || "Low Fade";
-    const beardStyle = parsed.beard_recommendation || "Clean shave";
-    const fadeStyle = parsed.fade_type || "Low fade";
-    const topStyle = parsed.top_style || "Textured top";
+    const recommendedCut = parsed.suggested_cut || fallbackCutFromAnswers(normalizedAnswers, analysisId);
+    const beardStyle = parsed.beard_recommendation || "Keep existing beard naturally";
+    const fadeStyle = parsed.fade_type || "Adapt fade to face shape";
+    const topStyle = parsed.top_style || "Maintain natural texture";
+    const beardRules = getBeardEditingRules(normalizedAnswers, parsed);
 
     const imagePrompt = `Professional barber visagism image editing.
 
@@ -425,18 +426,24 @@ MANDATORY RULES:
 - Keep the exact same person.
 
 FACIAL HAIR RULES:
-- Clean shave requested.
-- Remove beard only if beard exists.
-- NEVER add beard.
-- NEVER add mustache.
-- NEVER change facial hair unless requested.
+${beardRules}
 
 IMAGE RULES:
 - Same angle as original photo.
 - Same lighting.
 - Same background.
 - Same person.
-- Front portrait.`;
+- Front portrait.
+
+BARBER EXECUTION RULES:
+- Change only hair unless beard adjustment is explicitly needed.
+- Keep natural hair texture and natural hair color unless needed for realism.
+- Keep realistic professional barbershop result.
+- Respect user questionnaire preferences.
+- Analysis context: face shape (${parsed.face_shape || "unknown"}), hair type (${parsed.hair_type || "unknown"}), hair texture (${parsed.hair_texture || "unknown"}), hair volume (${parsed.hair_volume || "unknown"}), forehead (${parsed.forehead_size || parsed.forehead || "unknown"}), jaw (${parsed.jaw_shape || "unknown"}), beard (${parsed.beard_presence || "unknown"}).
+- Preferred fade: ${fadeStyle}.
+- Preferred top style: ${topStyle}.
+- Beard recommendation context: ${beardStyle}.`;
 
     let generatedDataUrl: string | null = await callImageModel(
       LOVABLE_API_KEY,
