@@ -11,7 +11,12 @@ type AnalysisFields = {
   face_shape?: string;
   jaw_shape?: string;
   forehead?: string;
+  forehead_size?: string;
   proportion?: string;
+  hair_type?: string;
+  hair_texture?: string;
+  hair_volume?: string;
+  beard_presence?: string;
   current_style?: string;
   contrast_level?: string;
   recommended_style?: string;
