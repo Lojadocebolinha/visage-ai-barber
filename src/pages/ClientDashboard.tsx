@@ -46,14 +46,15 @@ export default function ClientDashboard() {
     }
 
     if (aiResult?.error) {
+      console.error("AI Result Error:", aiResult.error);
       if (aiResult.error === "RATE_LIMITED") {
-        toast.error("Muitas requisições. Aguarde um momento e tente novamente.");
+        toast.error("⏱️ Muitas requisições. Aguarde um momento e tente novamente.");
       } else if (aiResult.error === "PAYMENT_REQUIRED") {
-        toast.error(translations.dashboard.sem_creditos);
+        toast.error("💳 " + translations.dashboard.sem_creditos);
       } else if (aiResult.error === "IMAGE_GENERATION_FAILED") {
-        toast.error("Não foi possível gerar a imagem do corte. Tente novamente.");
+        toast.error("🖼️ Não foi possível gerar a imagem do corte. Tente novamente.");
       } else {
-        toast.error("Erro na análise: " + aiResult.error);
+        toast.error("❌ Erro na análise: " + (aiResult.error || "Erro desconhecido"));
       }
       setStep("photo");
       return;
@@ -66,13 +67,15 @@ export default function ClientDashboard() {
       .single();
 
     if (fetchError || !updated) {
-      toast.error("Não foi possível carregar o resultado da análise.");
+      console.error("Fetch Error:", fetchError);
+      toast.error("❌ Não foi possível carregar o resultado da análise. Tente novamente.");
       setStep("photo");
       return;
     }
 
     if (!updated.generated_image_url) {
-      toast.error("A análise foi concluída, mas a imagem não foi gerada.");
+      console.error("No generated image URL in result");
+      toast.error("⚠️ A análise foi concluída, mas a imagem não foi gerada. Tente regenerar.");
       setStep("photo");
       return;
     }
@@ -91,7 +94,10 @@ export default function ClientDashboard() {
         .from("analysis-photos")
         .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload Error:", uploadError);
+        throw new Error("Erro ao enviar a foto. Tente novamente.");
+      }
 
       const {
         data: { publicUrl },
@@ -108,12 +114,16 @@ export default function ClientDashboard() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Database Error:", error);
+        throw new Error("Erro ao registrar a análise. Tente novamente.");
+      }
 
       setAnalysis(data);
       await runAnalysis(data, publicUrl);
     } catch (err: any) {
-      toast.error(err.message || "Erro ao enviar foto");
+      console.error("Photo Upload Error:", err);
+      toast.error("📸 " + (err.message || "Erro ao enviar a foto. Tente novamente."));
       setStep("photo");
     } finally {
       setUploading(false);
