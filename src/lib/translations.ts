@@ -281,7 +281,17 @@ export const translations = {
 
 // Função auxiliar para traduzir nomes de cortes
 export function traduzirCorte(nomeCortePT: string): string {
+  if (!nomeCortePT) return "Corte Personalizado";
+
+  // Limpar o nome: remover underscores, hífens e converter para minúsculas
+  const nomeAtualizado = nomeCortePT
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .trim();
+
   const corteMap: { [key: string]: string } = {
+    // Variações com espaços
     "mid fade": translations.cortes.fade_medio,
     "low fade": translations.cortes.fade_baixo,
     "high fade": translations.cortes.fade_alto,
@@ -299,7 +309,16 @@ export function traduzirCorte(nomeCortePT: string): string {
     "machine 3": translations.cortes.machine_3,
     "machine 4": translations.cortes.machine_4,
     "machine 5": translations.cortes.machine_5,
+    // Variações em Português
+    "fade médio": translations.cortes.fade_medio,
+    "fade baixo": translations.cortes.fade_baixo,
+    "fade alto": translations.cortes.fade_alto,
+    "degradê suave": translations.cortes.degrade_suave,
+    "corte social": translations.cortes.social,
+    "corte tesoura": translations.cortes.corte_tesoura,
+    "corte clássico": translations.cortes.classico,
+    "corte moderno": translations.cortes.moderno,
   };
 
-  return corteMap[nomeCortePT.toLowerCase()] || nomeCortePT;
+  return corteMap[nomeAtualizado] || nomeCortePT;
 }

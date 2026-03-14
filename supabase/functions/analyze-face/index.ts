@@ -332,7 +332,7 @@ serve(async (req) => {
 
     const mimeType = photoResponse.headers.get("content-type") || "image/jpeg";
     const base64Photo = cleanBase64(arrayBufferToBase64(await photoResponse.arrayBuffer()));
-    const analysisPrompt = `INSTRUÇÃO OBRIGATÓRIA: Responda EXCLUSIVAMENTE em Português do Brasil. NÃO use inglês em nenhuma parte do texto. Todos os campos de resposta devem estar em Português (Brasil).
+    const analysisPrompt = `INSTRUÇÃO OBRIGATÓRIA: Responda EXCLUSIVAMENTE em Português do Brasil. NÃO use inglês em nenhuma parte do texto. TODOS os campos de resposta (cut_explanation, maintenance_tips, beard_recommendation, etc) devem estar 100% em Português (Brasil). Nenhuma palavra em inglês.
 
 Você é uma IA profissional de barbeiro e visagista.
 
@@ -352,7 +352,8 @@ REGRAS DE SELEÇÃO DE CORTE:
 - Escolha o corte de forma profissional com base em evidências faciais/capilares + preferências do formulário.
 - NÃO escolha sempre o mesmo corte.
 - Estilos permitidos incluem (não limitado a): fade médio, fade baixo, fade alto, degradê, burst fade, social, corte tesoura, buzz cut, crew cut, mohawk, clássico, moderno, máquina 1 2 3 4 5.
-- Explique por que o estilo escolhido se adequa a esta pessoa.
+- Explique em PORTUGUÈS por que o estilo escolhido se adequa a esta pessoa.
+- A explicação (cut_explanation) DEVE ser detalhada e em Português.
 
 Respostas do questionário:
 ${answersText}
@@ -363,7 +364,24 @@ ${preferenceHints}
 Retorne APENAS JSON válido com as chaves:
 face_shape, jaw_shape, forehead, forehead_size, proportion, hair_type, hair_texture, hair_volume, beard_presence, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips
 
-Para maintenance_tips, retorne um array de strings curtas em Português (Brasil).`;
+Para maintenance_tips, retorne um array de strings curtas em Português (Brasil). CADA DICA DEVE SER 100% EM PORTUGUÈS.
+
+EXEMPLOS DE NOMES DE CORTES (use estes nomes limpos):
+- Fade Médio
+- Fade Baixo
+- Fade Alto
+- Degradê Suave
+- Burst Fade
+- Corte Social
+- Corte Tesoura
+- Buzz Cut
+- Crew Cut
+- Mohawk
+- Corte Clássico
+- Corte Moderno
+- Máquina #1, #2, #3, #4, #5
+
+NÃO use underscores, hífens ou códigos. Use nomes limpos e profissionais.`;
 
     const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
