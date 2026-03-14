@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Users, Zap, TrendingUp, MoreVertical } from "lucide-react";
+import { Users, Zap, TrendingUp, MoreVertical, Image as ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { addCreditsToUser, updateUserPlan } from "@/lib/creditsManager";
 import {
@@ -30,6 +30,8 @@ export default function AdminUserManagement() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [creditsToAdd, setCreditsToAdd] = useState<number>(5);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
+  const [userAnalyses, setUserAnalyses] = useState<Record<string, Tables<"analyses">[]>>({});
 
   useEffect(() => {
     fetchUsers();
@@ -52,6 +54,24 @@ export default function AdminUserManagement() {
     } catch (error) {
       toast.error("Erro ao carregar usuários");
       setLoading(false);
+    }
+  };
+
+  const fetchUserAnalyses = async (userId: string) => {
+    try {
+      const { data: analyses, error } = await supabase
+        .from("analyses")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setUserAnalyses((prev) => ({
+        ...prev,
+        [userId]: analyses || [],
+      }));
+    } catch (error) {
+      toast.error("Erro ao carregar análises do usuário");
     }
   };
 
@@ -84,6 +104,12 @@ export default function AdminUserManagement() {
     }
   };
 
+  const handleViewResults = async (userId: string) => {
+    if (!userAnalyses[userId]) {
+      await fetchUserAnalyses(userId);
+    }
+  };
+
   if (loading) {
     return <div className="text-center py-8 text-muted-foreground">Carregando usuários...</div>;
   }
@@ -95,16 +121,18 @@ export default function AdminUserManagement() {
         <h3 className="text-lg font-semibold text-foreground">Gerenciar Usuários</h3>
       </div>
 
-      <div className="space-y-3 max-h-96 overflow-y-auto">
+      <div className="space-y-3 max-h-[600px] overflow-y-auto">
         {users.map((user) => {
           const credits = user.user_credits?.[0];
           const role = user.user_roles?.[0]?.role || "cliente";
+          const analyses = userAnalyses[user.id] || [];
 
           return (
             <Card key={user.id} className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <p className="font-medium text-foreground">{user.full_name || "Sem nome"}</p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
                   <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                     <span className="capitalize">{role}</span>
                     {credits && (
@@ -126,6 +154,10 @@ export default function AdminUserManagement() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleViewResults(user.id)}>
+                      <ImageIcon className="w-4 h-4 mr-2" />
+                      Ver Resultados
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setSelectedUser(user.id)}>
                       Adicionar Créditos
                     </DropdownMenuItem>
@@ -167,10 +199,69 @@ export default function AdminUserManagement() {
                   </Button>
                 </div>
               )}
+
+              {/* Mostrar resultados gerados */}
+              {analyses.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                    Resultados Gerados ({analyses.length})
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {analyses.map((analysis) => (
+                      <div
+                        key={analysis.id}
+                        className="relative group cursor-pointer rounded overflow-hidden bg-secondary"
+                        onClick={() => setSelectedImageUrl(analysis.generated_image_url)}
+                      >
+                        {analysis.generated_image_url ? (
+                          <>
+                            <img
+                              src={analysis.generated_image_url}
+                              alt={`Resultado ${analysis.suggested_cut}`}
+                              className="w-full h-24 object-cover hover:opacity-75 transition-opacity"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                              <ImageIcon className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </>
+                        ) : (
+                          <div className="w-full h-24 flex items-center justify-center text-xs text-muted-foreground">
+                            Sem imagem
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Card>
           );
         })}
       </div>
+
+      {/* Modal para visualizar imagem em tela cheia */}
+      {selectedImageUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedImageUrl(null)}
+        >
+          <div className="relative max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 text-white hover:bg-white/20"
+              onClick={() => setSelectedImageUrl(null)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+            <img
+              src={selectedImageUrl}
+              alt="Resultado em tela cheia"
+              className="w-full h-auto rounded-lg"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

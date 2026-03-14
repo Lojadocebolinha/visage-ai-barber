@@ -49,9 +49,9 @@ export default function Navbar() {
             <>
               {isAdmin && (
                 <Button
-                  variant={location.pathname === "/admin" ? "default" : "ghost"}
+                  variant="default"
                   onClick={() => navigate("/admin")}
-                  className="gap-2"
+                  className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold shadow-md"
                 >
                   <BarChart3 className="w-4 h-4" />
                   {translations.navbar.painel_admin}
@@ -109,12 +109,12 @@ export default function Navbar() {
               <>
                 {isAdmin && (
                   <Button
-                    variant={location.pathname === "/admin" ? "default" : "outline"}
+                    variant="default"
                     onClick={() => {
                       navigate("/admin");
                       setIsOpen(false);
                     }}
-                    className="w-full justify-start gap-2"
+                    className="w-full justify-start gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white font-semibold"
                   >
                     <BarChart3 className="w-4 h-4" />
                     {translations.navbar.painel_admin}

@@ -332,7 +332,9 @@ serve(async (req) => {
 
     const mimeType = photoResponse.headers.get("content-type") || "image/jpeg";
     const base64Photo = cleanBase64(arrayBufferToBase64(await photoResponse.arrayBuffer()));
-    const analysisPrompt = `Você é uma IA profissional de barbeiro e visagista.
+    const analysisPrompt = `INSTRUÇÃO OBRIGATÓRIA: Responda EXCLUSIVAMENTE em Português do Brasil. NÃO use inglês em nenhuma parte do texto. Todos os campos de resposta devem estar em Português (Brasil).
+
+Você é uma IA profissional de barbeiro e visagista.
 
 Analise a foto enviada e as respostas do questionário para selecionar o melhor corte de cabelo profissional para esta pessoa exata.
 
@@ -417,7 +419,9 @@ Para maintenance_tips, retorne um array de strings curtas em Português (Brasil)
     const topStyle = parsed.top_style || "Maintain natural texture";
     const beardRules = getBeardEditingRules(normalizedAnswers, parsed);
 
-    const imagePrompt = `Você é uma IA profissional de barbeiro visagista. Sua tarefa é realizar edição de imagem-para-imagem para aplicar um novo corte de cabelo à pessoa na foto enviada, seguindo rigorosamente as regras abaixo.
+    const imagePrompt = `INSTRUÇÃO OBRIGATÓRIA: Responda EXCLUSIVAMENTE em Português do Brasil. NÃO use inglês em nenhuma parte. Todos os textos devem estar em Português (Brasil).
+
+Você é uma IA profissional de barbeiro visagista. Sua tarefa é realizar edição de imagem-para-imagem para aplicar um novo corte de cabelo à pessoa na foto enviada, seguindo rigorosamente as regras abaixo.
 
 ESTILO DE CORTE ALVO: ${recommendedCut}
 
