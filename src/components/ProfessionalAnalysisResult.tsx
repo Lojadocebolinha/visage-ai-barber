@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Download, RefreshCw, Share2, Heart, Maximize2 } from "lucide-react";
+import { Download, RefreshCw, Share2, Heart, Maximize2, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import ImageViewer from "@/components/ImageViewer";
 import { translations, traduzirCorte } from "@/lib/translations";
+import WhatsAppShare from "@/components/WhatsAppShare";
 
 interface ProfessionalAnalysisResultProps {
   analysis: Tables<"analyses">;
@@ -227,6 +228,17 @@ export default function ProfessionalAnalysisResult({
             {translations.resultado.salvar_resultado}
           </Button>
         )}
+      </div>
+
+      {/* WhatsApp Share Button */}
+      <div className="pt-4 border-t">
+        <WhatsAppShare
+          clientName="Cliente"
+          suggestedCut={traduzirCorte(analysis.suggested_cut || "Corte Profissional")}
+          beardRecommendation={analysis.beard_recommendation || "Conforme análise"}
+          cutExplanation={analysis.cut_explanation || "Análise realizada"}
+          generatedImageUrl={analysis.generated_image_url || undefined}
+        />
       </div>
 
       {/* Image Viewer Modal */}

@@ -64,102 +64,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-function extractImageDataUrl(payload: any): string | null {
-  const fromChoices = payload?.choices?.[0]?.message;
-
-  // OpenAI-compatible image path
-  const choiceImage = fromChoices?.images?.[0]?.image_url?.url;
-  if (typeof choiceImage === "string" && choiceImage.startsWith("data:image/")) {
-    return choiceImage;
-  }
-
-  // Some gateways may return image in content array
-  if (Array.isArray(fromChoices?.content)) {
-    for (const part of fromChoices.content) {
-      if (part?.image_url?.url && typeof part.image_url.url === "string") {
-        const url = part.image_url.url;
-        if (url.startsWith("data:image/")) return url;
-      }
-      if (part?.inline_data?.data && part?.inline_data?.mime_type) {
-        return `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`;
-      }
-      if (part?.inlineData?.data && part?.inlineData?.mimeType) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-    }
-  }
-
-  // Gemini generateContent path
-  const parts = payload?.candidates?.[0]?.content?.parts;
-  if (Array.isArray(parts)) {
-    for (const part of parts) {
-      if (part?.inlineData?.data && part?.inlineData?.mimeType) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
-      if (part?.inline_data?.data && part?.inline_data?.mime_type) {
-        return `data:${part.inline_data.mime_type};base64,${part.inline_data.data}`;
-      }
-    }
-  }
-
-  // OpenAI image generation fallback path
-  const b64 = payload?.data?.[0]?.b64_json;
-  if (typeof b64 === "string") {
-    return `data:image/png;base64,${b64}`;
-  }
-
-  return null;
-}
-
-async function callImageModel(
-  LOVABLE_API_KEY: string,
-  model: string,
-  prompt: string,
-  mimeType: string,
-  base64Image: string
-): Promise<string | null> {
-  const payload = {
-    model,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: prompt },
-          { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-        ],
-      },
-    ],
-    modalities: ["image", "text"],
-    responseModalities: ["TEXT", "IMAGE"],
-  };
-
-  console.log("Calling image model:", model);
-
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    console.error("Image model failed:", model, response.status, body);
-    return null;
-  }
-
-  const data = await response.json();
-  const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-  if (typeof imageUrl === "string" && imageUrl.startsWith("data:image/")) {
-    return imageUrl;
-  }
-
-  // Fallback extraction
-  return extractImageDataUrl(data);
-}
-
 function extractMessageText(content: unknown): string {
   if (typeof content === "string") return content;
 
@@ -186,7 +90,7 @@ function hashString(input: string): number {
 }
 
 function pickSeededOption(seed: string, options: string[]): string {
-  if (!options.length) return "Low Fade";
+  if (!options.length) return "Fade Baixo";
   const idx = hashString(seed) % options.length;
   return options[idx];
 }
@@ -204,14 +108,14 @@ function buildPreferenceHints(answers: Record<string, unknown>): string[] {
   const change = toLower(answers.change);
 
   return [
-    formal.includes("sim") ? "Work context: formal." : "Work context: not strictly formal.",
-    style.includes("moderno") ? "Preferred vibe: modern." : "Preferred vibe: discreet/classic.",
-    pomade.includes("pomada") ? "Styling product accepted." : "Natural finish preferred.",
-    hairloss.includes("sim") ? "Has hairline recession or thinning areas." : "No clear hairline recession preference.",
-    length.includes("sim") ? "Wants to keep some top length." : "Open to shorter top.",
-    beard.includes("sim") ? "Usually wears beard." : "Usually no beard.",
-    maintenance.includes("sim") ? "Wants low-maintenance haircut." : "Accepts medium/high maintenance.",
-    change.includes("sim") ? "Open to stronger visual change." : "Prefers conservative changes.",
+    formal.includes("sim") ? "Contexto de trabalho: formal." : "Contexto de trabalho: não estritamente formal.",
+    style.includes("moderno") ? "Vibe preferida: moderna." : "Vibe preferida: discreta/clássica.",
+    pomade.includes("pomada") ? "Produto de estilo aceito." : "Acabamento natural preferido.",
+    hairloss.includes("sim") ? "Tem recessão de linha de cabelo ou áreas de afinamento." : "Sem preferência clara de recessão de linha.",
+    length.includes("sim") ? "Quer manter um pouco de comprimento no topo." : "Aberto a topo mais curto.",
+    beard.includes("sim") ? "Geralmente usa barba." : "Geralmente sem barba.",
+    maintenance.includes("sim") ? "Quer corte de baixa manutenção." : "Aceita manutenção média/alta.",
+    change.includes("sim") ? "Aberto a mudança visual mais forte." : "Prefere mudanças conservadoras.",
   ];
 }
 
@@ -224,48 +128,48 @@ function fallbackCutFromAnswers(answers: Record<string, unknown>, seed: string):
   const change = toLower(answers.change);
   const hairloss = toLower(answers.hairloss);
 
-    const allCuts = [
-    "Mid Fade",
-    "Low Fade",
-    "High Fade",
-    "Taper",
+  const allCuts = [
+    "Fade Médio",
+    "Fade Baixo",
+    "Fade Alto",
+    "Degradê Suave",
     "Burst Fade",
-    "Social Cut",
-    "Scissor Cut",
+    "Corte Social",
+    "Corte Tesoura",
     "Buzz Cut",
     "Crew Cut",
     "Mohawk",
-    "Classic Cut",
-    "Modern Cut",
-    "Machine Cut #1",
-    "Machine Cut #2",
-    "Machine Cut #3",
-    "Machine Cut #4",
-    "Machine Cut #5",
+    "Corte Clássico",
+    "Corte Moderno",
+    "Máquina #1",
+    "Máquina #2",
+    "Máquina #3",
+    "Máquina #4",
+    "Máquina #5",
   ];
 
   const modernCuts = [
-    "Mid Fade",
-    "High Fade",
+    "Fade Médio",
+    "Fade Alto",
     "Burst Fade",
-    "Taper",
-    "Modern Cut",
+    "Degradê Suave",
+    "Corte Moderno",
   ];
 
   const classicCuts = [
-    "Social Cut",
-    "Classic Cut",
-    "Scissor Cut",
-    "Low Fade",
+    "Corte Social",
+    "Corte Clássico",
+    "Corte Tesoura",
+    "Fade Baixo",
     "Crew Cut",
   ];
 
   let possibleCuts = [...allCuts];
 
   if (maintenance.includes("sim") && hairloss.includes("sim")) {
-    possibleCuts = ["Buzz Cut", "Crew Cut", "Machine Cut #3"];
+    possibleCuts = ["Buzz Cut", "Crew Cut", "Máquina #3"];
   } else if (maintenance.includes("sim")) {
-    possibleCuts = ["Crew Cut", "Low Fade", "Buzz Cut", "Taper"];
+    possibleCuts = ["Crew Cut", "Fade Baixo", "Buzz Cut", "Degradê Suave"];
   } else if (formal.includes("sim") && !change.includes("sim")) {
     possibleCuts = classicCuts;
   } else if (style.includes("moderno") || change.includes("sim")) {
@@ -289,36 +193,134 @@ function getBeardEditingRules(answers: Record<string, unknown>, parsed: Analysis
 
   if (noBeardContext) {
     return [
-      "- If the original photo has no beard, keep it clean-shaven.",
-      "- NEVER add beard.",
-      "- NEVER add mustache.",
-      "- Do not alter jawline structure.",
+      "- Se a foto original não tem barba, mantenha feita.",
+      "- NUNCA adicione barba.",
+      "- NUNCA adicione bigode.",
+      "- Não altere a estrutura da mandíbula.",
     ].join("\n");
   }
 
   if (beardRecommendation.includes("clean shave") || beardRecommendation.includes("barba feita")) {
     return [
-      "- Clean shave requested.",
-      "- Remove beard only if beard exists in original photo.",
-      "- NEVER add beard.",
-      "- NEVER add mustache.",
+      "- Limpeza solicitada.",
+      "- Remova barba apenas se existir na foto original.",
+      "- NUNCA adicione barba.",
+      "- NUNCA adicione bigode.",
     ].join("\n");
   }
 
   return [
-    "- If beard exists, keep it unless style requires subtle adjustment.",
-    "- If no beard, do not add beard.",
-    "- Only change beard if truly needed for harmony.",
-    "- NEVER change facial identity.",
+    "- Se barba existe, mantenha a menos que o estilo exija ajuste sutil.",
+    "- Se sem barba, não adicione barba.",
+    "- Altere barba apenas se realmente necessário para harmonia.",
+    "- NUNCA mude a identidade facial.",
   ].join("\n");
+}
+
+// HuggingFace API calls
+async function callLlavaAnalysis(
+  HUGGINGFACE_API_KEY: string,
+  base64Image: string,
+  mimeType: string,
+  prompt: string
+): Promise<string> {
+  const response = await fetch("https://api-inference.huggingface.co/models/llava-hf/llava-1.5-7b-hf", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      inputs: {
+        image: `data:${mimeType};base64,${base64Image}`,
+        prompt: prompt,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("Llava analysis failed:", response.status, error);
+    throw new Error(`Llava analysis failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data[0]?.generated_text || "";
+}
+
+async function callMistralGeneration(
+  HUGGINGFACE_API_KEY: string,
+  prompt: string
+): Promise<string> {
+  const response = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: {
+        max_new_tokens: 1000,
+        temperature: 0.7,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("Mistral generation failed:", response.status, error);
+    throw new Error(`Mistral generation failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data[0]?.generated_text || "";
+}
+
+async function callStableDiffusion(
+  HUGGINGFACE_API_KEY: string,
+  base64Image: string,
+  mimeType: string,
+  prompt: string
+): Promise<string | null> {
+  try {
+    const response = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        inputs: prompt,
+        parameters: {
+          num_inference_steps: 50,
+          guidance_scale: 7.5,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Stable Diffusion generation failed:", response.status, error);
+      return null;
+    }
+
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const base64 = arrayBufferToBase64(arrayBuffer);
+    return `data:image/png;base64,${base64}`;
+  } catch (error) {
+    console.error("Stable Diffusion error:", error);
+    return null;
+  }
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const HUGGINGFACE_API_KEY = Deno.env.get("HUGGINGFACE_API_KEY");
+    if (!HUGGINGFACE_API_KEY) throw new Error("HUGGINGFACE_API_KEY is not configured");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -332,41 +334,43 @@ serve(async (req) => {
 
     const mimeType = photoResponse.headers.get("content-type") || "image/jpeg";
     const base64Photo = cleanBase64(arrayBufferToBase64(await photoResponse.arrayBuffer()));
-    const analysisPrompt = `INSTRUÇÃO OBRIGATÓRIA: Responda EXCLUSIVAMENTE em Português do Brasil. NÃO use inglês em nenhuma parte do texto. TODOS os campos de resposta (cut_explanation, maintenance_tips, beard_recommendation, etc) devem estar 100% em Português (Brasil). Nenhuma palavra em inglês.
 
-Você é uma IA profissional de barbeiro e visagista.
+    // Normalize answers
+    const normalizedAnswers = Object.fromEntries(
+      Object.entries(answers || {}).map(([k, v]) => [k, String(v || "").toLowerCase()])
+    );
 
-Analise a foto enviada e as respostas do questionário para selecionar o melhor corte de cabelo profissional para esta pessoa exata.
+    const answersText = Object.entries(normalizedAnswers)
+      .map(([k, v]) => `- ${k}: ${v}`)
+      .join("\n");
 
-ANÁLISE PROFISSIONAL OBRIGATÓRIA:
-- forma do rosto
-- tipo de cabelo
-- textura do cabelo
-- volume do cabelo
-- tamanho da testa
-- forma da mandíbula
-- presença de barba
-- preferências do usuário do formulário
+    const preferenceHints = buildPreferenceHints(normalizedAnswers);
 
-REGRAS DE SELEÇÃO DE CORTE:
-- Escolha o corte de forma profissional com base em evidências faciais/capilares + preferências do formulário.
-- NÃO escolha sempre o mesmo corte.
-- Estilos permitidos incluem (não limitado a): fade médio, fade baixo, fade alto, degradê, burst fade, social, corte tesoura, buzz cut, crew cut, mohawk, clássico, moderno, máquina 1 2 3 4 5.
-- Explique em PORTUGUÈS por que o estilo escolhido se adequa a esta pessoa.
-- A explicação (cut_explanation) DEVE ser detalhada e em Português.
+    // Step 1: Analyze image with Llava 1.5
+    const llavaPrompt = `Você é um barbeiro e visagista profissional. Analise esta foto de rosto e cabelo.
+
+Responda EXCLUSIVAMENTE em Português do Brasil. Nenhuma palavra em inglês.
+
+Analise:
+- Formato do rosto (oval, redondo, quadrado, triangular, diamante, retangular)
+- Tipo de cabelo (liso, ondulado, cacheado, crespo, afro)
+- Textura do cabelo
+- Volume do cabelo (fino, médio, espesso, muito espesso)
+- Tamanho da testa
+- Forma da mandíbula
+- Presença de barba (sim/não)
+- Proporções faciais
 
 Respostas do questionário:
 ${answersText}
 
-Dicas de preferência derivadas:
-${preferenceHints}
+Dicas de preferência:
+${preferenceHints.join("\n")}
 
 Retorne APENAS JSON válido com as chaves:
 face_shape, jaw_shape, forehead, forehead_size, proportion, hair_type, hair_texture, hair_volume, beard_presence, current_style, contrast_level, recommended_style, suggested_cut, fade_type, top_style, beard_recommendation, mustache_recommendation, cut_difficulty, barber_level, cut_explanation, maintenance_tips
 
-Para maintenance_tips, retorne um array de strings curtas em Português (Brasil). CADA DICA DEVE SER 100% EM PORTUGUÈS.
-
-EXEMPLOS DE NOMES DE CORTES (use estes nomes limpos):
+Nomes de cortes permitidos (use estes nomes limpos):
 - Fade Médio
 - Fade Baixo
 - Fade Alto
@@ -381,50 +385,23 @@ EXEMPLOS DE NOMES DE CORTES (use estes nomes limpos):
 - Corte Moderno
 - Máquina #1, #2, #3, #4, #5
 
-NÃO use underscores, hífens ou códigos. Use nomes limpos e profissionais.`;
+NÃO use underscores, hífens ou códigos. Use nomes limpos e profissionais.
+Para maintenance_tips, retorne um array de strings curtas em Português (Brasil).`;
 
-    const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: analysisPrompt },
-              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Photo}` } },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!analysisResponse.ok) {
-      const status = analysisResponse.status;
-      if (status === 429) throw new Error("RATE_LIMITED");
-      if (status === 402) throw new Error("PAYMENT_REQUIRED");
-      throw new Error(`Analysis failed: ${status}`);
-    }
-
-    const analysisData = await analysisResponse.json();
-    const rawContent = analysisData?.choices?.[0]?.message?.content;
-    const rawText = extractMessageText(rawContent);
+    console.log("Calling Llava for image analysis...");
+    const llavaResponse = await callLlavaAnalysis(HUGGINGFACE_API_KEY, base64Photo, mimeType, llavaPrompt);
 
     let parsed: AnalysisFields = {};
     try {
-      const match = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const jsonText = (match?.[1] || rawText).trim();
+      const match = llavaResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const jsonText = (match?.[1] || llavaResponse).trim();
       parsed = JSON.parse(jsonText);
     } catch {
       parsed = {
         face_shape: "oval",
-        suggested_cut: "Low Fade Texturizado",
+        suggested_cut: "Fade Baixo Texturizado",
         beard_recommendation: "Barba curta alinhada",
-        cut_explanation: rawText.slice(0, 700) || "Corte equilibrado para valorizar suas proporções faciais.",
+        cut_explanation: llavaResponse.slice(0, 700) || "Corte equilibrado para valorizar suas proporções faciais.",
         maintenance_tips: ["Retoque a cada 2-3 semanas."],
       };
     }
@@ -432,83 +409,35 @@ NÃO use underscores, hífens ou códigos. Use nomes limpos e profissionais.`;
     parsed.face_shape = normalizeFaceShape(parsed.face_shape);
 
     const recommendedCut = parsed.suggested_cut || fallbackCutFromAnswers(normalizedAnswers, analysisId);
-    const beardStyle = parsed.beard_recommendation || "Keep existing beard naturally";
-    const fadeStyle = parsed.fade_type || "Adapt fade to face shape";
-    const topStyle = parsed.top_style || "Maintain natural texture";
+    const beardStyle = parsed.beard_recommendation || "Mantenha barba existente naturalmente";
+    const fadeStyle = parsed.fade_type || "Adapte fade à forma do rosto";
+    const topStyle = parsed.top_style || "Mantenha textura natural";
     const beardRules = getBeardEditingRules(normalizedAnswers, parsed);
 
-    const imagePrompt = `INSTRUÇÃO OBRIGATÓRIA: Responda EXCLUSIVAMENTE em Português do Brasil. NÃO use inglês em nenhuma parte. Todos os textos devem estar em Português (Brasil).
-
-Você é uma IA profissional de barbeiro visagista. Sua tarefa é realizar edição de imagem-para-imagem para aplicar um novo corte de cabelo à pessoa na foto enviada, seguindo rigorosamente as regras abaixo.
+    // Step 2: Generate image with Stable Diffusion
+    const imagePrompt = `Você é uma IA profissional de barbeiro visagista. Sua tarefa é gerar uma imagem realista mostrando um novo corte de cabelo.
 
 ESTILO DE CORTE ALVO: ${recommendedCut}
 
-REGRAS OBRIGATÓRIAS DE EDIÇÃO DE IMAGEM:
-- Use a foto enviada como base para todas as edições.
-- Esta é edição imagem-para-imagem; NÃO gere uma nova imagem do zero.
-- Preserve a identidade da pessoa original 100%. Isto inclui:
-  - NÃO gerar um novo rosto.
-  - Manter exatamente os mesmos olhos, nariz, boca e estrutura facial geral.
-  - Manter a cor e tom de pele original.
-  - Manter a idade e gênero original da pessoa.
-- A imagem de saída DEVE ser uma foto realista, não uma renderização artística ou desenho.
-- Mantenha o mesmo ângulo, condições de iluminação e fundo da foto original.
-- CRÍTICO: NÃO rode a imagem. Mantenha exatamente a mesma orientação da foto original.
-- CRÍTICO: NÃO distora ou estique o rosto. Mantenha a proporção de aspecto e proporções faciais.
-- CRÍTICO: NÃO inverta ou espelhe a imagem horizontalmente ou verticalmente.
-- Garanta que o rosto mantenha suas proporções naturais sem nenhum esticamento ou compressão.
+REGRAS OBRIGATÓRIAS:
+- Gere uma imagem realista de um rosto com o corte de cabelo sugerido.
+- Preserve a identidade geral da pessoa (mesma forma de rosto, idade, gênero, tom de pele).
+- Mantenha a textura natural e cor natural do cabelo.
+- O corte deve ser um corte de barbeiro realista e profissional.
+- Mantenha a mesma iluminação e fundo.
+- NÃO rode ou distora a imagem.
+- Qualidade profissional de corte de barbeiro.
 
-REGRAS DE EDIÇÃO DE CABELO:
-- Altere APENAS o cabelo. Concentre-se em aplicar o ESTILO DE CORTE ALVO.
-- Mantenha a textura natural e cor natural do cabelo da pessoa, a menos que o estilo escolhido exija explicitamente um ajuste sutil e realista (por exemplo, um leve aprimoramento de tom para realismo).
-- O corte deve ser um corte de barbeiro realista, como se realizado por um profissional.
-- A seleção do corte é baseada no contexto de análise (forma do rosto, tipo de cabelo, respostas do formulário, preferência de estilo).
-- Garanta que o estilo escolhido seja aplicado dinamicamente, evitando resultados repetitivos.
-- Estilos permitidos incluem: fade médio, fade baixo, fade alto, degradê, burst fade, social, corte tesoura, buzz cut, crew cut, mohawk, clássico, moderno, máquina 1 2 3 4 5.
-
-REGRAS DE EDIÇÃO DE BARBA:
-${beardRules}
-
-CONTEXTO DE ANÁLISE PARA SELEÇÃO DE CORTE:
+CONTEXTO DE ANÁLISE:
 - Forma do Rosto: ${parsed.face_shape || "desconhecida"}
 - Tipo de Cabelo: ${parsed.hair_type || "desconhecido"}
-- Textura do Cabelo: ${parsed.hair_texture || "desconhecida"}
 - Volume do Cabelo: ${parsed.hair_volume || "desconhecido"}
-- Testa: ${parsed.forehead_size || parsed.forehead || "desconhecida"}
-- Mandíbula: ${parsed.jaw_shape || "desconhecida"}
 - Presença de Barba: ${parsed.beard_presence || "desconhecida"}
-- Fade Preferido: ${fadeStyle}
-- Estilo de Topo Preferido: ${topStyle}
-- Contexto de Recomendação de Barba: ${beardStyle}
 
-Respeite todas as preferências do questionário do usuário fornecidas na fase de análise.
+Gere uma imagem de alta qualidade e realista refletindo o novo corte de cabelo.`;
 
-Produz uma imagem de alta qualidade e realista refletindo o novo corte de cabelo.
-
-IMPORTANTE: Garanta que a imagem final tenha:
-- Orientação correta (sem rotação)
-- Sem distorção ou esticamento facial
-- Mesma proporção de aspecto que o original
-- Proporções faciais naturais preservadas
-- Qualidade profissional de corte de barbeiro
-
-    let generatedDataUrl: string | null = await callImageModel(
-      LOVABLE_API_KEY,
-      "google/gemini-3.1-flash-image-preview",
-      imagePrompt,
-      mimeType,
-      base64Photo
-    );
-
-    if (!generatedDataUrl) {
-      generatedDataUrl = await callImageModel(
-        LOVABLE_API_KEY,
-        "google/gemini-2.5-flash-image",
-        imagePrompt,
-        mimeType,
-        base64Photo
-      );
-    }
+    console.log("Calling Stable Diffusion for image generation...");
+    let generatedDataUrl: string | null = await callStableDiffusion(HUGGINGFACE_API_KEY, base64Photo, mimeType, imagePrompt);
 
     let generatedImageUrl: string | null = null;
 
@@ -533,6 +462,18 @@ IMPORTANTE: Garanta que a imagem final tenha:
       throw new Error("IMAGE_GENERATION_FAILED");
     }
 
+    // Step 3: Generate detailed explanation with Mistral
+    const explanationPrompt = `Você é um barbeiro profissional. Explique em Português (Brasil) por que o corte "${recommendedCut}" é ideal para uma pessoa com:
+- Formato de rosto: ${parsed.face_shape}
+- Tipo de cabelo: ${parsed.hair_type}
+- Volume de cabelo: ${parsed.hair_volume}
+
+Forneça uma explicação profissional e detalhada (máximo 300 palavras). Responda EXCLUSIVAMENTE em Português (Brasil).`;
+
+    console.log("Calling Mistral for explanation generation...");
+    const explanationResponse = await callMistralGeneration(HUGGINGFACE_API_KEY, explanationPrompt);
+    const cutExplanation = explanationResponse.slice(0, 1000) || parsed.cut_explanation || "Corte equilibrado para valorizar suas proporções faciais.";
+
     const tips = Array.isArray(parsed.maintenance_tips)
       ? parsed.maintenance_tips.join("\n• ")
       : (parsed.maintenance_tips || "");
@@ -554,7 +495,7 @@ IMPORTANTE: Garanta que a imagem final tenha:
         mustache_recommendation: parsed.mustache_recommendation || null,
         cut_difficulty: parsed.cut_difficulty || null,
         barber_level: parsed.barber_level || null,
-        cut_explanation: parsed.cut_explanation || null,
+        cut_explanation: cutExplanation || null,
         maintenance_tips: tips || null,
         generated_image_url: generatedImageUrl,
         status: "completed",
@@ -568,7 +509,7 @@ IMPORTANTE: Garanta que a imagem final tenha:
         success: true,
         face_shape: parsed.face_shape,
         suggested_cut: parsed.suggested_cut,
-        cut_explanation: parsed.cut_explanation,
+        cut_explanation: cutExplanation,
         maintenance_tips: tips,
         generated_image_url: generatedImageUrl,
       }),
