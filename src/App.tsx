@@ -9,6 +9,7 @@ import LandingPage from "./pages/LandingPage.tsx";
 import AuthPage from "./pages/AuthPage.tsx";
 import ClientDashboard from "./pages/ClientDashboard.tsx";
 import AdminDashboard from "./pages/AdminDashboard.tsx";
+import AnalysisFlow from "./pages/AnalysisFlow.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/dashboard" element={<ClientDashboard />} />
+            <Route path="/analysis" element={<AnalysisFlow />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
